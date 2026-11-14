@@ -16,6 +16,7 @@
 import { existsSync, readdirSync, readFileSync, openSync, readSync, closeSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { matchSpec } from '../lib/sources.mjs'
 
 const home = homedir()
 const JSON_OUT = process.argv.includes('--json')
@@ -148,9 +149,16 @@ async function score(file, size) {
     const hasSession = tables.some((name) => /^sessions?$/i.test(name) || /_sessions?$/i.test(name) || /^thread/i.test(name))
     const hasMessage = tables.some((name) => /messages?$/i.test(name) || /_messages?$/i.test(name) || /^thread_items$/i.test(name))
     const hinted = tables.some((name) => SESSION_WORD.test(name))
-    const value = hasSession && hasMessage ? 100 : hasSession ? 75 : hinted ? 55 : 12
-    const shape = hasSession && hasMessage ? 'readable: session + message' : hasSession ? 'session table only' : hinted ? 'session-ish tables' : 'no session tables'
-    return { score: value, kind: 'sqlite', shape, tables: tables.slice(0, 8) }
+    const matched = matchSpec(tables)
+    const value = matched ? 100 : hasSession ? 75 : hinted ? 55 : 12
+    const shape = matched
+      ? `matches spec: ${matched.spec.id}`
+      : hasSession
+        ? 'session table only, no spec'
+        : hinted
+          ? 'session-ish tables, no spec'
+          : 'no session tables'
+    return { score: value, kind: 'sqlite', shape, spec: matched?.spec.id ?? null, tables: tables.slice(0, 8) }
   }
   // Text: judge by what the first lines look like.
   const lines = headLines(file)
@@ -208,6 +216,7 @@ async function main() {
     console.log(`${app.app}${known}   score ${app.score}`)
     console.log(`   store : ${app.full.replace(home, '~')}  (${Math.round(app.size / 1024)} kB)`)
     console.log(`   kind  : ${app.kind} · ${app.shape}`)
+    if (app.spec) console.log(`   spec  : ${app.spec}  → 通用采集器可直接读`)
     if (app.tables.length) console.log(`   tables: ${app.tables.join(', ')}`)
   }
   console.log(`
