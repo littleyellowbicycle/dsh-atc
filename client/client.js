@@ -178,22 +178,22 @@ window.__ModuleLoader__.load({
         hint: '存储自带 completed/archived —— 归档的会话也算完成',
       },
       stopped: {
-        label: '已停',
+        label: '中止',
         color: '#6e7781',
         soft: 'rgba(110,119,129,.12)',
-        hint: '存储自带 terminated/cancel/stop',
+        hint: '被中止的终态：存储自带 terminated / cancel / stop / aborted',
       },
       recent: {
-        label: '刚停',
+        label: '刚动过',
         color: PALETTE.slate,
         soft: 'rgba(139,148,158,.12)',
-        hint: '最近动过，但不在运行中',
+        hint: '半小时内动过，但存储没说它结束 —— 这是时间，不是终态',
       },
       idle: {
-        label: '无动静',
+        label: '长期无动静',
         color: '#aeb6c0',
         soft: 'rgba(174,182,192,.14)',
-        hint: '存储没有自带状态，而且很久没动了 —— 不代表已归档',
+        hint: '半小时以上没动，存储也没说它结束 —— 不代表已归档',
       },
     }
 
@@ -507,19 +507,31 @@ window.__ModuleLoader__.load({
     /* ------------------------------------------------------------- derivation */
 
     /** Split the flat payload into the bands a human actually triages. */
+    /**
+     * Group rows for reading, not for statistics.
+     *
+     * The first three bands come from what the store asserts (a turn is open, a
+     * turn ended with a reason). The last two are only age — and they are kept
+     * apart from the terminal states on purpose: "just ended" and "quiet for a
+     * while" are different facts, and merging them made 完成 look like 中止.
+     */
     function band(items) {
       const attention = []
       const running = []
-      const recent = []
+      const ended = []
+      const active = []
       const older = []
       const cutoff = Date.now() - 30 * 60_000
+      const endedCutoff = Date.now() - 24 * 60 * 60_000
+      const terminal = new Set(['done', 'stopped'])
       for (const item of items) {
         if (item.status === 'needs-you' || item.status === 'failed') attention.push(item)
         else if (item.status === 'running') running.push(item)
-        else if (item.lastActivity >= cutoff) recent.push(item)
+        else if (terminal.has(item.status) && item.lastActivity >= endedCutoff) ended.push(item)
+        else if (item.lastActivity >= cutoff) active.push(item)
         else older.push(item)
       }
-      return { attention, running, recent, older }
+      return { attention, running, ended, active, older }
     }
 
     /** Apply the visible filters (search, window, status, agent). */
@@ -1215,7 +1227,8 @@ function EmptyState({ board }) {
         () => ({
           attention: sortItems(bands.attention, sort),
           running: sortItems(bands.running, sort),
-          recent: sortItems(bands.recent, sort),
+          ended: sortItems(bands.ended, sort),
+          active: sortItems(bands.active, sort),
           older: sortItems(bands.older, sort),
         }),
         [bands, sort],
@@ -1689,14 +1702,26 @@ function EmptyState({ board }) {
                 onOpen,
               }),
               h(Group, {
-                title: '最近动过',
-                items: sortedBands.recent,
+                title: '刚结束',
+                items: sortedBands.ended,
+                color: STATUS.done.color,
+                defaultOpen: false,
+                onMenu: openMenu,
+                starSet: starred,
+                onStar: toggleStar,
+                onOpen,
+                hint: '24 小时内有终态 · 点开查看',
+              }),
+              h(Group, {
+                title: '刚动过',
+                items: sortedBands.active,
                 color: STATUS.recent.color,
                 defaultOpen: true,
                 onMenu: openMenu,
                 starSet: starred,
                 onStar: toggleStar,
                 onOpen,
+                hint: '半小时内动过，没说结束',
               }),
               h(Group, {
                 title: '更早',
