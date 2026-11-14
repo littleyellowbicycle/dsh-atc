@@ -1409,7 +1409,11 @@ window.__ModuleLoader__.load({
     /* ------------------------------------------------------------------ css */
 
     const CSS = `
-.fb-page{box-sizing:border-box;--fb-line:var(--dsw-alias-border-l1,#e8ebf0);--fb-line-soft:var(--dsw-alias-border-l2,#eff1f4);--fb-surface:var(--dsw-alias-card-fill,#fff);--fb-fill:var(--dsw-alias-interactive-bg-hover,#f3f5f8);--fb-elevated:var(--dsw-alias-button-elevated-fill,#f4f5f7);--fb-hover:var(--dsw-alias-interactive-bg-hover,#f3f5f8);--fb-text:var(--dsw-alias-label-primary,#1f2328);--fb-text-2:var(--dsw-alias-label-secondary,#57606a);--fb-text-3:var(--dsw-alias-label-tertiary,#8b949e);--fb-text-4:var(--dsw-alias-label-quaternary,#a8b0ba);--fb-r-xs:var(--dsw-radius-xs,4px);--fb-r-sm:var(--dsw-radius-sm,8px);--fb-r-md:var(--dsw-radius-md,12px);--fb-r-lg:var(--dsw-radius-lg,16px);max-width:1180px;margin:0 auto;padding:18px 22px 36px;color:var(--fb-text);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.fb-page::-webkit-scrollbar{width:10px}
+.fb-page::-webkit-scrollbar-thumb{background:var(--fb-line);border-radius:8px;border:3px solid transparent;background-clip:content-box}
+.fb-page::-webkit-scrollbar-thumb:hover{background:var(--fb-text-4);background-clip:content-box}
+.fb-page{scrollbar-width:thin;scrollbar-color:var(--fb-line) transparent}
+.fb-page{box-sizing:border-box;height:100%;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;--fb-line:var(--dsw-alias-border-l1,#e8ebf0);--fb-line-soft:var(--dsw-alias-border-l2,#eff1f4);--fb-surface:var(--dsw-alias-card-fill,#fff);--fb-fill:var(--dsw-alias-interactive-bg-hover,#f3f5f8);--fb-elevated:var(--dsw-alias-button-elevated-fill,#f4f5f7);--fb-hover:var(--dsw-alias-interactive-bg-hover,#f3f5f8);--fb-text:var(--dsw-alias-label-primary,#1f2328);--fb-text-2:var(--dsw-alias-label-secondary,#57606a);--fb-text-3:var(--dsw-alias-label-tertiary,#8b949e);--fb-text-4:var(--dsw-alias-label-quaternary,#a8b0ba);--fb-r-xs:var(--dsw-radius-xs,4px);--fb-r-sm:var(--dsw-radius-sm,8px);--fb-r-md:var(--dsw-radius-md,12px);--fb-r-lg:var(--dsw-radius-lg,16px);max-width:1180px;margin:0 auto;padding:18px 22px 36px;color:var(--fb-text);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
 .fb-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
 .fb-title{display:flex;align-items:center;gap:8px}
 .fb-h1{margin:0;font-size:16px;font-weight:650;letter-spacing:.01em}
