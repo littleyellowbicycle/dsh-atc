@@ -61,12 +61,21 @@ test('host registers one route and answers the board payload', async () => {
   assert.equal(typeof board.attention, 'number')
   assert.equal(typeof board.running, 'number')
   assert.equal(typeof board.total, 'number')
+  assert.ok(Array.isArray(board.agents), 'agents is an array')
+  for (const agent of board.agents) {
+    assert.equal(typeof agent.tool, 'string')
+    assert.equal(typeof agent.parsed, 'boolean')
+    assert.equal(typeof agent.path, 'string')
+  }
   for (const source of board.sources) {
     assert.equal(typeof source.tool, 'string')
     assert.equal(typeof source.available, 'boolean')
   }
   for (const item of board.items) {
-    assert.ok(['dsh', 'codex', 'opencode', 'workbuddy'].includes(item.tool), `tool ${item.tool}`)
+    assert.ok(
+      ['dsh', 'codex', 'opencode', 'workbuddy', 'gemini'].includes(item.tool),
+      `tool ${item.tool}`,
+    )
     assert.equal(typeof item.workspace, 'string')
     assert.equal(typeof item.lastActivity, 'number')
     assert.ok(
