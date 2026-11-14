@@ -7,7 +7,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -19,8 +19,16 @@ const clicks = process.argv
   .slice(3)
   .filter((arg) => arg.startsWith('--click='))
   .map((arg) => arg.slice('--click='.length))
+/** Optional post-click expression, for inspecting the live DOM. */
+const evalArg = process.argv.slice(3).find((arg) => arg.startsWith('--eval='))
+const evalFile = process.argv.slice(3).find((arg) => arg.startsWith('--eval-file='))
+const evalExpression = evalFile
+  ? readFileSync(evalFile.slice('--eval-file='.length), 'utf8')
+  : evalArg?.slice('--eval='.length)
 if (!target) {
-  console.error('usage: node scripts/live-check.mjs <url-with-token> [--click=<aria-label>]...')
+  console.error(
+    'usage: node scripts/live-check.mjs <url-with-token> [--click=<aria-label>]... [--eval=<expression>]',
+  )
   process.exit(2)
 }
 
@@ -152,6 +160,10 @@ try {
     returnByValue: true,
   })
 
+  if (evalExpression) {
+    const custom = await cdp.send('Runtime.evaluate', { expression: evalExpression, returnByValue: true })
+    console.log('custom:', JSON.stringify(custom.result.value))
+  }
   const shot = await cdp.send('Page.captureScreenshot', { format: 'png' })
   const file = join(root, 'live-check.png')
   writeFileSync(file, Buffer.from(shot.data, 'base64'))
