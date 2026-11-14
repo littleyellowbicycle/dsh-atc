@@ -13,7 +13,7 @@ dshmarket 的 README 写得很直白：*「市场里的插件列表来自精选�
 
 1. **`package.json` 必须声明 `dsh.bundle`** —— 这是能被 `dsh plugin add` 装上的前提。官方明确说：*最常见的被拒原因是只声明了 `dsh.client`*。本项目两处都有。
 2. 仓库加 **`dsh-plugin`** topic。
-3. 公开的 GitHub 仓库 —— 条目文件是**按仓库**命名的（`data/plugins/<owner>__<repo>.yml`），所以必须有公开 repo。
+3. 公开的 GitHub 仓库 —— 条目文件是**按仓库**命名的（`data/plugins/littleyellowbicycle__<repo>.yml`），所以必须有公开 repo。
 4. `engines.dsh` 或 `@deepseek-ai/dsh-*` peer 要写清宿主版本；peer 范围若不带显式 prerelease 分支，会静默排除所有 prerelease 版宿主 —— 所以这里写的是 `>=0.2.0-0` 而不是 `>=0.2.0`。
 
 ## 步骤
@@ -27,7 +27,7 @@ cd /path/to/dsh-fleet-board
 git init
 git add .
 git commit -m "feat: multi-agent fleet board for DeepSeek Harness"
-git remote add origin https://github.com/<owner>/dsh-fleet-board.git
+git remote add origin https://github.com/littleyellowbicycle/dsh-fleet-board.git
 git push -u origin main
 ```
 
@@ -36,9 +36,9 @@ git push -u origin main
 并在 `package.json` 补上（当前故意留空，等仓库地址确定）：
 
 ```json
-"repository": { "type": "git", "url": "git+https://github.com/<owner>/dsh-fleet-board.git" },
-"homepage": "https://github.com/<owner>/dsh-fleet-board#readme",
-"bugs": { "url": "https://github.com/<owner>/dsh-fleet-board/issues" }
+"repository": { "type": "git", "url": "git+https://github.com/littleyellowbicycle/dsh-fleet-board.git" },
+"homepage": "https://github.com/littleyellowbicycle/dsh-fleet-board#readme",
+"bugs": { "url": "https://github.com/littleyellowbicycle/dsh-fleet-board/issues" }
 ```
 
 ### 2. 发布 npm 包（可选，但推荐）
@@ -55,11 +55,11 @@ npm publish
 
 ### 3. 给 awesome-dsh-plugin 提 PR
 
-只加**一个文件** `data/plugins/<owner>__dsh-fleet-board.yml`：
+只加**一个文件** `data/plugins/littleyellowbicycle__dsh-fleet-board.yml`：
 
 ```yaml
-url: https://github.com/<owner>/dsh-fleet-board
-name: <owner>/dsh-fleet-board
+url: https://github.com/littleyellowbicycle/dsh-fleet-board
+name: littleyellowbicycle/dsh-fleet-board
 category: session
 description:
   en: One right-sidebar board listing every local agent's sessions (DSH, codex, opencode, WorkBuddy) with attention-first grouping, folded history and zero model calls.
