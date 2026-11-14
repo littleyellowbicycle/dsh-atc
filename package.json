@@ -5,6 +5,14 @@
   "type": "module",
   "main": "./lib/index.js",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/littleyellowbicycle/dsh-fleet-board.git"
+  },
+  "homepage": "https://github.com/littleyellowbicycle/dsh-fleet-board#readme",
+  "bugs": {
+    "url": "https://github.com/littleyellowbicycle/dsh-fleet-board/issues"
+  },
   "keywords": [
     "deepseek-harness",
     "dsh",
