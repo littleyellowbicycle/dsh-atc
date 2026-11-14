@@ -20,7 +20,6 @@ window.__ModuleLoader__.load({
     const PANEL_ID = 'atc'
     const ENDPOINT = '/dsh-atc/data'
     const POLL_MS = 5000
-    const ROW_CAP = 60
     const DAY = 86_400_000
 
     /* ---------------------------------------------------------------- store */
@@ -841,7 +840,7 @@ window.__ModuleLoader__.load({
             `${tool} ${count}`,
           ),
         )
-      const shown = open ? items.slice(0, ROW_CAP) : []
+      const shown = open ? items : []
       return h(
         'section',
         { className: 'fb-group' },
@@ -864,9 +863,6 @@ window.__ModuleLoader__.load({
               { className: 'fb-session-grid' },
               shown.map((item) => h(SessionCard, { key: `${item.tool}:${item.key}`, item, onOpen })),
             )
-          : null,
-        open && items.length > ROW_CAP
-          ? h('div', { className: 'fb-cap' }, `只显示前 ${ROW_CAP} 条，共 ${items.length} 条`)
           : null,
       )
     }
@@ -1521,7 +1517,6 @@ window.__ModuleLoader__.load({
 .fb-meter i{display:block;height:100%;border-radius:999px;background:#d98324}
 .fb-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 9px;border-radius:999px;white-space:nowrap}
 .fb-status-dot{width:5px;height:5px;border-radius:50%;display:inline-block}
-.fb-cap{padding:4px 12px;font-size:10.5px;color:var(--fb-text-4)}
 .fb-skel{height:11px;border-radius:5px;background:linear-gradient(90deg,#eef0f3,#f7f8fa,#eef0f3);background-size:200% 100%;animation:fb-sh 1.4s linear infinite}
 @keyframes fb-sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .fb-empty,.fb-error{padding:14px 2px;font-size:12px;color:var(--fb-text-3)}

@@ -161,8 +161,20 @@ try {
   })
 
   if (evalExpression) {
-    const custom = await cdp.send('Runtime.evaluate', { expression: evalExpression, returnByValue: true })
+    const custom = await cdp.send('Runtime.evaluate', { expression: evalExpression, returnByValue: true, awaitPromise: true })
     console.log('custom:', JSON.stringify(custom.result.value))
+  }
+  if (process.argv.includes('--console')) {
+    for (const event of cdp.events) {
+      if (event.method === 'Runtime.exceptionThrown') {
+        const detail = event.params?.exceptionDetails
+        console.log('exception:', (detail?.exception?.description ?? detail?.text ?? '').split('\n').slice(0, 6).join(' | '))
+      }
+      if (event.method === 'Runtime.consoleAPICalled' && ['error', 'warning'].includes(event.params?.type)) {
+        const text = (event.params.args ?? []).map((a) => a.description ?? a.value ?? '').join(' ')
+        console.log('console.' + event.params.type + ':', String(text).split('\n').slice(0, 4).join(' | ').slice(0, 300))
+      }
+    }
   }
   const shot = await cdp.send('Page.captureScreenshot', { format: 'png' })
   const file = join(root, 'live-check.png')
