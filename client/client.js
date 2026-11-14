@@ -24,7 +24,7 @@ window.__ModuleLoader__.load({
 
     /* ---------------------------------------------------------------- store */
 
-    const store = { data: null, error: null, at: 0, listeners: new Set() }
+    const store = { data: null, error: null, at: 0, paused: false, listeners: new Set() }
 
     function publish(patch) {
       Object.assign(store, patch)
@@ -51,7 +51,11 @@ window.__ModuleLoader__.load({
     function startPolling() {
       if (timer !== null) return () => {}
       refresh()
-      timer = setInterval(refresh, POLL_MS)
+      // A paused board keeps its last snapshot: screenshots and demos should
+      // not have rows moving under the cursor.
+      timer = setInterval(() => {
+        if (!store.paused) refresh()
+      }, POLL_MS)
       return () => {
         if (timer !== null) clearInterval(timer)
         timer = null
@@ -805,16 +809,18 @@ window.__ModuleLoader__.load({
             status.label,
           ),
           ctx
-            ? h(
-                'span',
-                { className: 'fb-session-ctx', title: `上下文占用 ${ctx[1]}%` },
-                h('span', { className: 'fb-session-ctx-label' }, `ctx ${ctx[1]}%`),
-                h(
+            ? (() => {
+                // A warning colour that fires at 35% is a colour nobody reads:
+                // green until half, amber approaching the limit, red past it.
+                const pct = Math.min(100, Number(ctx[1]))
+                const tone = pct < 50 ? PALETTE.green : pct < 80 ? PALETTE.amber : PALETTE.red
+                return h(
                   'span',
-                  { className: 'fb-meter' },
-                  h('i', { style: { width: `${Math.min(100, Number(ctx[1]))}%` } }),
-                ),
-              )
+                  { className: 'fb-session-ctx', title: `上下文占用 ${pct}%` },
+                  h('span', { className: 'fb-session-ctx-label', style: { color: tone } }, `ctx ${pct}%`),
+                  h('span', { className: 'fb-meter' }, h('i', { style: { width: `${pct}%`, background: tone } })),
+                )
+              })()
             : extra
               ? h('span', { className: 'fb-session-detail' }, extra)
               : null,
@@ -934,7 +940,14 @@ function EmptyState({ board }) {
       const [statusFilter, setStatusFilter] = useState('all')
       const [toolFilter, setToolFilter] = useState('all')
       const [sort, setSort] = useState('time')
+      const [paused, setPaused] = useState(false)
       const board = state.data
+
+      // The poller reads this flag; keeping it in the store means pausing does
+      // not need to tear down and rebuild the interval.
+      useEffect(() => {
+        store.paused = paused
+      }, [paused])
 
       const flash = useCallback((text) => {
         setNotice(text)
@@ -1002,6 +1015,11 @@ function EmptyState({ board }) {
       // counting unreadable agents in the denominator would misread as broken.
       const activeTools = board ? new Set(board.items.map((item) => item.tool)).size : 0
       const unreadable = board ? (board.agents || []).filter((agent) => !agent.parsed).length : 0
+      // An agent whose store exists but cannot be read is a fault, not a
+      // statistic: name it where work is waiting.
+      const unreadableNames = board
+        ? (board.agents || []).filter((agent) => !agent.parsed).map((agent) => agent.tool)
+        : []
       const totalTools = board ? (board.sources || []).length : 0
       const lastSeen = board && board.items.length ? board.items[0].lastActivity : 0
 
@@ -1055,7 +1073,11 @@ function EmptyState({ board }) {
                 '本地推断 · 零 token',
               ),
             ),
-            h('p', { className: 'fb-sub' }, '本机所有 agent 的会话 · 每 5 秒自动刷新'),
+            h(
+              'p',
+              { className: 'fb-sub' },
+              paused ? '已暂停刷新 · 页面内容停在那一刻' : '本机所有 agent 的会话 · 每 5 秒自动刷新',
+            ),
           ),
           h(
             'div',
@@ -1063,10 +1085,21 @@ function EmptyState({ board }) {
             h(
               'span',
               { className: 'fb-live' },
-              h('i', { className: 'fb-live-dot' }),
+              h('i', { className: 'fb-live-dot fb-live-dot-paused', style: paused ? { background: STATUS['needs-you'].color } : undefined }),
               `更新于 ${clockTime(state.at)}`,
             ),
             h(Segmented, { options: RANGES, value: range, onChange: setRange }),
+            h(
+              'button',
+              {
+                type: 'button',
+                className: `fb-btn${paused ? ' fb-btn-on' : ''}`,
+                title: paused ? '恢复自动刷新' : '暂停自动刷新（截图、演示、专注时用）',
+                onClick: () => setPaused((value) => !value),
+              },
+              paused ? '▶' : '⏸',
+              paused ? '继续' : '暂停',
+            ),
             h(
               'button',
               { type: 'button', className: 'fb-btn', onClick: () => refresh() },
@@ -1088,30 +1121,16 @@ function EmptyState({ board }) {
               h(
                 'div',
                 { className: 'fb-kpis' },
+                h(Kpi, { value: String(attention), label: '要你处理', color: STATUS['needs-you'].color, note: '等你拍板或需要重试' }),
                 h(Kpi, { value: String(running), label: '在跑', color: STATUS.running.color, note: '正在推进的会话' }),
-                h(Kpi, { value: String(attention), label: '等你', color: STATUS['needs-you'].color, note: '等你拍板' }),
-                h(Kpi, { value: String(failedCount), label: '失败', color: STATUS.failed.color, note: '需要你处理' }),
-                h(Kpi, { value: String(doneCount), label: '完成', color: STATUS.done.color, note: '已收尾的会话' }),
-                h(Kpi, {
-                  value: String(board.total || board.items.length),
-                  label: '本机会话',
-                  note: `显示 ${board.items.length} 条`,
-                }),
-                h(Kpi, {
-                  value: `${activeTools}/${totalTools}`,
-                  label: '接入的 agent',
-                  extra: h(AgentStrip, { rows: tools }),
-                  note: (() => {
-                    const empty = Math.max(0, totalTools - activeTools - unreadable)
-                    const parts = []
-                    if (empty > 0) parts.push(`${empty} 个无数据`)
-                    if (unreadable > 0) parts.push(`${unreadable} 个读不了`)
-                    return parts.length ? parts.join(' · ') : '全部可用'
-                  })(),
-                }),
+                h(Kpi, { value: String(failedCount), label: '失败', color: STATUS.failed.color, note: '最近失败的会话' }),
               ),
-
               h(
+                'div',
+                { className: 'fb-kpi-note' },
+                `完成 ${doneCount} · 本机 ${board.total || board.items.length} · 接入 ${activeTools}/${totalTools}` +
+                  (unreadable > 0 ? ` · ${unreadable} 个读不了` : ''),
+              ),            h(
                 'div',
                 { className: 'fb-charts' },
                 h(
@@ -1404,6 +1423,19 @@ function EmptyState({ board }) {
                   )
                 : null,
 
+              unreadable > 0
+                ? h(
+                    'div',
+                    { className: 'fb-alert' },
+                    h('span', { className: 'fb-alert-mark' }, '!'),
+                    h(
+                      'span',
+                      null,
+                      `${unreadableNames.join('、')} 的会话存在但读不了——状态未知，不是没有任务。`,
+                    ),
+                  )
+                : null,
+
               h(Group, {
                 title: '要你处理',
                 items: sortedBands.attention,
@@ -1561,6 +1593,13 @@ function EmptyState({ board }) {
 .fb-meter i{display:block;height:100%;border-radius:999px;background:#d98324}
 .fb-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 9px;border-radius:999px;white-space:nowrap}
 .fb-status-dot{width:5px;height:5px;border-radius:50%;display:inline-block}
+/* One line of inventory under the action KPIs, instead of four more cards. */
+.fb-kpi-note{margin:-2px 0 14px;font-size:11px;color:var(--fb-text-4)}
+/* A fault worth acting on, placed above the work queue. */
+.fb-alert{display:flex;align-items:center;gap:9px;padding:9px 12px;margin:0 0 12px;border:1px solid rgba(217,131,36,.35);background:rgba(217,131,36,.08);border-radius:var(--fb-r-sm);font-size:11.5px;color:var(--fb-text-2)}
+.fb-alert-mark{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;background:var(--fb-amber,rgba(217,131,36,.9));color:#fff;font-size:10px;font-weight:700;flex:none}
+.fb-btn-on{background:var(--fb-fill);color:var(--fb-text)}
+.fb-live-dot-paused{background:var(--fb-text-4)}
 .fb-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:56px 24px;margin:8px 0 24px;border:1px dashed var(--fb-line);border-radius:var(--fb-r-md);text-align:center}
 .fb-empty-mark{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:var(--fb-fill);color:var(--fb-text-3);margin-bottom:2px}
 .fb-empty-title{margin:0;font-size:14px;font-weight:600;color:var(--fb-text)}
