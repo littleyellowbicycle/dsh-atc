@@ -24,7 +24,23 @@ DeepSeek Harness 的 Agent 空管中心：在**左侧栏**加一行（和「插�
 | zcode | `~/.zcode/cli/db/db.sqlite` | sqlite（`session` + `message.time_updated`，与 opencode 同构） |
 | minimax | `~/.minimax/v2/sqlite/runtime-state.sqlite` | sqlite（`local_runtime_sessions.status/updated_at_ms` + 记录里的 `workspaceDir`） |
 
-读不了的会单独标出来，而不是假装不存在：看板探测 14 个候选工具，**能读的进列表，不能读的进 chip 行的「未接入」**（悬停显示探测到它时的路径）。目前读不了的是 Trae（`ModularData/ai-agent/database.db` 不是标准 SQLite，疑似加密容器）、Claude Code（这台机器上没有 `~/.claude/projects/` 会话目录）、Qoder（未安装）。任何一个源失败只降级该源，不影响整板。
+读不了的会单独标出来，而不是假装不存在：看板探测 14 个候选工具，**能读的进列表，不能读的进 chip 行的第二段**（悬停显示路径 + 读不了的原因）。目前读不了的是 Trae（`ModularData/ai-agent/database.db` 是 SQLCipher 加密库）、Claude Code（这台机器上没有 `~/.claude/projects/` 会话目录）、Qoder（未安装）。任何一个源失败只降级该源，不影响整板。
+
+## 读不了的 agent，为什么，以及有没有办法
+
+| 工具 | 现状 | 原因 |
+|---|---|---|
+| **Trae**（IDE / SOLO） | chip 显示 `trae 已加密` | 会话在 `%APPDATA%\Trae CN\ModularData\ai-agent\database.db`（≈151 MB），文件头不是 `SQLite format 3`，是 **SQLCipher 加密库**；`state.vscdb` 倒能打开，但里面只有主题、模型列表、最近打开路径，没有对话 |
+| **Claude Code** | chip 显示 `claude 未接入` | 这台机器只有 `~/.claude` 的 skills/plugins 和 1 kB 的 `.claude.json`（无 `history`），**没有可读的历史**。别的机器上 `~/.claude/projects/<slug>/<uuid>.jsonl` 是明文，可直接接 |
+| **Qoder** | 不出现 | 未安装（`~/.qoder`、`%APPDATA%\Qoder`、注册表都没有） |
+
+Trae 有三条路，按「干净程度」排：
+
+1. **装 TRAE CLI（最干净）** —— CLI 2.0（`traex`）把会话写成 `~/.trae/cli/sessions/YYYY/MM/DD/rollout-*.jsonl`，**明文 jsonl**，和现有的 codex 解析器同构。本机没装 CLI，所以还没接；装了就能接。
+2. **让 Trae 自己导出** —— 社区 MCP 服务 [`mcp-session-saver`](https://www.npmjs.com/package/mcp-session-saver) 在 Trae 里说一句「保存当前会话」，就把对话按 IDE/日期落成 Markdown。插件再读那个目录即可，**零逆向**。
+3. **解密数据库** —— [`Oh-My-Trae/trae-db-decrypt`](https://github.com/Oh-My-Trae/trae-db-decrypt) 做的是进程发现 + 内存扫描拿密钥。能work，但要读进程内存、随 Trae 版本失效、风险自担，**不建议集进插件**。
+
+Trae 官方论坛也确认过这条边界：`database.db` 加密、暂不支持查看，界面只给 Markdown 导出（[1](https://forum.trae.cn/t/topic/52906)、[2](https://forum.trae.cn/t/topic/174212/4)）。
 
 ## 界面怎么排
 

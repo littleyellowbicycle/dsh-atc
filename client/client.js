@@ -1047,10 +1047,12 @@ window.__ModuleLoader__.load({
                         {
                           key: `unparsed-${agent.tool}`,
                           className: 'fb-chip fb-chip-off fb-chip-muted',
-                          title: `检测到 ${agent.path}，但还没有解析器`,
+                          title: agent.reason
+                            ? `${agent.path} — ${agent.reason}`
+                            : `检测到 ${agent.path}，但还没有解析器`,
                         },
                         agent.tool,
-                        h('span', { className: 'fb-chip-count' }, '未接入'),
+                        h('span', { className: 'fb-chip-count' }, agent.reason?.includes('加密') ? '已加密' : '未接入'),
                       ),
                     ),
                   ]
