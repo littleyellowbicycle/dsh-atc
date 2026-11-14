@@ -45,24 +45,39 @@ git push -u origin main
 
 不发布也能上架（市场会走 build-from-source），但发布后**安装免 `allowBuilds` 构建授权**，市场还能显示下载量。
 
+**状态：已发布。** `dsh-atc@0.16.0` 在 registry 上，`latest` 指向它。首次发布时 npm 的 staged publishing 会先留一个 `0.0.0-stage` 占位版本，真实版本上传后自动被覆盖，无需处理。
+
+发新版本：
+
 ```powershell
-npm login          # 需要人工交互
-npm pack --dry-run # 先看会打包哪些文件
-npm publish
+# 0. 改 package.json 的 version（不要重复发布同一版本，npm 会拒绝）
+npm.cmd pack --dry-run     # 先看会打包哪些文件
+
+# 1. 登录（本机 .npmrc 指向 npmmirror，所以必须显式指定 registry）
+npm.cmd login --auth-type=web --registry=https://registry.npmjs.org/
+
+# 2. 发布
+npm.cmd publish --registry=https://registry.npmjs.org/
 ```
 
-包名 `dsh-atc` 目前**未被占用**（已查 registry 404）。
+两条容易踩的：
+
+- **npm 现在强制要求账号开启 2FA 才能发布**。没开会一直报 `403 ... Two-factor authentication ... is required`。去 https://www.npmjs.com/settings/<用户名>/profile 开启 `Authorization and writes`，之后发布会在浏览器里确认一次。
+- Windows 上 PowerShell 执行策略禁止跑 `npm.ps1`，命令要写 `npm.cmd`。
+- `prepublishOnly` 会跑 `check` + `test` + 脱敏自查，任一失败就自己拒绝发布。
 
 ### 3. 给 awesome-dsh-plugin 提 PR
 
 只加**一个文件** `data/plugins/littleyellowbicycle__dsh-atc.yml`：
+
+**状态：已提 PR → [#15224](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15224)（1 file, +7）**，等维护者合并。合并后 CI 每天重建 `plugins.json`，dshmarket 才看得到。
 
 ```yaml
 url: https://github.com/littleyellowbicycle/dsh-atc
 name: littleyellowbicycle/dsh-atc
 category: session
 description:
-  en: One right-sidebar board listing every local agent's sessions (DSH, codex, opencode, WorkBuddy) with attention-first grouping, folded history and zero model calls.
+  en: One sidebar panel listing every local coding agent's sessions (DSH, codex, opencode, WorkBuddy) with attention-first grouping, folded history and zero model calls.
   zh: 在右栏一屏看完本机所有 agent 的会话（DSH/codex/opencode/WorkBuddy），按注意力分档、历史折叠，全程零 token。
 ```
 

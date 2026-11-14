@@ -8,6 +8,12 @@ DeepSeek Harness 的 Agent 空管中心：在**左侧栏**加一行（和「插�
 
 零 token —— 宿主侧只读本地会话存储、纯本地推断状态，不经过任何模型。
 
+```powershell
+dsh plugin add dsh-atc
+```
+
+装完重启 DSH（宿主侧插件只在启动时组合），左侧栏出现「空管」。
+
 ## 它解决什么
 
 同时用 DSH / codex / opencode / WorkBuddy / Trae / MiniMax 时，注意力会被切成 N 份。这个插件把「谁在跑、谁停了、谁在等我」压到一屏。
@@ -184,24 +190,51 @@ turn/end.reason.kind → completed / error / aborted / approval / …
 | codex | `volcengine` | rollout 头部的 `model_provider` |
 | dsh / opencode | 无 | 其存储不提供 per-session 成本 |
 
-## 安装（desktop profile）
+## 安装
+
+### 从 npm（推荐）
 
 ```powershell
-# 1. 备份
-Copy-Item "$env:USERPROFILE\.dsh\profiles\desktop\package.json" `
-          "$env:USERPROFILE\.dsh\profiles\desktop\package.json.bak"
+dsh plugin add dsh-atc
+```
 
-# 2. 在 package.json 里加两处
-#    dependencies."dsh-atc" = "link:/path/to/dsh-atc"
-#    dsh.profile.bundles 追加 "dsh-atc"
+桌面端也可以在「插件 → 添加插件」里填 `dsh-atc`。
 
-# 3. 用 runtime 自带 pnpm 装（不要用系统 pnpm）
+装指定版本：
+
+```powershell
+dsh plugin add dsh-atc@0.16.0
+```
+
+### 从 GitHub（npm 不可用时）
+
+```powershell
+dsh plugin add github:littleyellowbicycle/dsh-atc#v0.16.0
+```
+
+这条不需要 npm，但首次安装会走一次源码构建，需要放行构建脚本。
+
+### 从本地源码
+
+用来改代码，改动会立刻生效（`lib/` 需重启，`client/` 刷新页面即可）：
+
+```powershell
+dsh plugin add "link:/path/to/dsh-atc"
+```
+
+或者手改 profile 的 `package.json`，把 `dependencies."dsh-atc"` 指向本地路径、`dsh.profile.bundles` 里追加 `"dsh-atc"`，然后用 DSH runtime 自带的 pnpm 安装（不要用系统 pnpm，版本不匹配会报 lockfile 错误）：
+
+```powershell
 $rt = "$env:USERPROFILE\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies"
 cd "$env:USERPROFILE\.dsh\profiles\desktop"
 & "$rt\node\bin\node.exe" "$rt\pnpm\bin\pnpm.cjs" install
 ```
 
-**必须重启桌面端**：宿主侧插件只在启动时组合进 profile，热加载不生效。
+> desktop profile 由桌面应用独占管理，CLI 的 `dsh plugin` 命令不能改它——桌面端请走「插件」页面。
+
+### 装完必须重启桌面端
+
+宿主侧插件只在启动时组合进 profile，热加载不生效。只改了 `client/` 的话，刷新页面就够。
 
 ## 使用
 
@@ -241,4 +274,10 @@ node scripts/live-check.mjs 'http://127.0.0.1:60200/?token=<token>' `
 
 ## 卸载
 
-删掉 `package.json` 里那两处，重跑 pnpm install，重启。
+```powershell
+dsh plugin remove dsh-atc
+```
+
+然后重启 DSH。桌面端在「插件」页面里移除。
+
+从本地源码装的话，删掉 profile `package.json` 里 `dependencies` 和 `bundles` 这两处，重跑 pnpm install，再重启。
