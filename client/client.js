@@ -872,7 +872,7 @@ window.__ModuleLoader__.load({
  * install: the reader needs to know what was looked for, and whether something
  * exists that the board could still read.
  */
-function EmptyState({ board, onRescan }) {
+function EmptyState({ board }) {
   const agents = board.agents || []
   const found = agents.filter((agent) => agent.parsed)
   const unreadable = agents.filter((agent) => !agent.parsed)
@@ -900,9 +900,9 @@ function EmptyState({ board, onRescan }) {
         : null,
     ),
     h(
-      'button',
-      { type: 'button', className: 'fb-btn', onClick: () => onRescan() },
-      '重新扫描',
+      'p',
+      { className: 'fb-empty-hint' },
+      '启动后会自动扫描一次；装了什么新工具，下次启动就会出现在这里。',
     ),
   )
 }
@@ -1388,7 +1388,7 @@ function EmptyState({ board, onRescan }) {
               ),
 
               board.items.length === 0
-                ? h(EmptyState, { board, onRescan: refresh })
+                ? h(EmptyState, { board })
                 : null,
 
               filtered.length === 0
@@ -1566,6 +1566,7 @@ function EmptyState({ board, onRescan }) {
 .fb-empty-title{margin:0;font-size:14px;font-weight:600;color:var(--fb-text)}
 .fb-empty-sub{margin:0;font-size:12px;color:var(--fb-text-3);max-width:420px;line-height:1.6}
 .fb-empty-facts{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;font-size:11px;color:var(--fb-text-4);margin:6px 0 10px}
+.fb-empty-hint{margin:2px 0 0;font-size:11px;color:var(--fb-text-4)}
 .fb-empty-new{color:var(--fb-text-2)}
 .fb-skel{height:11px;border-radius:5px;background:linear-gradient(90deg,#eef0f3,#f7f8fa,#eef0f3);background-size:200% 100%;animation:fb-sh 1.4s linear infinite}
 @keyframes fb-sh{0%{background-position:200% 0}100%{background-position:-200% 0}}

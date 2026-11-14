@@ -54,7 +54,11 @@ definition.__test.store.at = Date.now()
 const html = renderToStaticMarkup(createElement(definition.__test.FleetPage, { ctx: { get: () => null } }))
 const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 
-const checks = ['还没有可显示的会话', '探测 1 个 agent', '可接入', 'AionUi', '重新扫描']
+const checks = ['还没有可显示的会话', '探测 1 个 agent', '可接入', 'AionUi', '自动扫描']
+if (text.includes('重新扫描')) {
+  console.error('the rescan button was supposed to be removed')
+  process.exit(1)
+}
 const missing = checks.filter((needle) => !text.includes(needle))
 if (missing.length) {
   console.error('missing:', missing.join(' | '))
