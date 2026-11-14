@@ -100,6 +100,31 @@ window.__ModuleLoader__.load({
       }
     }
 
+    /**
+     * Sessions the reader starred. A star is a deliberate "I care about this
+     * one" signal, so starred rows are lifted out of the status bands and shown
+     * first — a finished session you are watching should not sink to "older".
+     */
+    const STAR_KEY = 'dsh-atc:starred'
+
+    function loadStarred() {
+      try {
+        const raw = globalThis.localStorage?.getItem(STAR_KEY)
+        const list = raw ? JSON.parse(raw) : []
+        return new Set(Array.isArray(list) ? list : [])
+      } catch {
+        return new Set()
+      }
+    }
+
+    function saveStarred(set) {
+      try {
+        globalThis.localStorage?.setItem(STAR_KEY, JSON.stringify([...set]))
+      } catch {
+        /* a blocked storage must not break starring within this session */
+      }
+    }
+
     function saveHidden(set) {
       try {
         globalThis.localStorage?.setItem(HIDDEN_KEY, JSON.stringify([...set]))
@@ -845,7 +870,7 @@ window.__ModuleLoader__.load({
      * Session card: title + relative time on top, agent / workspace tags in
      * the middle, status and context pressure on the footer.
      */
-    function SessionCard({ item, onOpen, onMenu }) {
+    function SessionCard({ item, onOpen, onMenu, starred, onStar }) {
       const status = STATUS[item.status] || STATUS.idle
       const color = AGENT_COLOR[item.tool] || PALETTE.slate
       const clickable = Boolean(item.sessionId)
@@ -876,6 +901,22 @@ window.__ModuleLoader__.load({
           'div',
           { className: 'fb-session-top' },
           h('div', { className: 'fb-session-title' }, item.title),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: `fb-star${starred ? ' fb-star-on' : ''}`,
+              title: starred ? '取消标星' : '标星，置顶显示',
+              'aria-pressed': starred ? 'true' : 'false',
+              onClick: (event) => {
+                // Starring must not also open the session behind the card.
+                event.stopPropagation()
+                onStar(item)
+              },
+              onKeyDown: (event) => event.stopPropagation(),
+            },
+            starred ? '★' : '☆',
+          ),
           h('div', { className: 'fb-session-time' }, ago(item.lastActivity)),
         ),
         h('div', { className: 'fb-session-date' }, fullDate(item.lastActivity)),
@@ -924,7 +965,7 @@ window.__ModuleLoader__.load({
     }
 
     /** Collapsible band of sessions. */
-    function Group({ title, items, color, defaultOpen, onOpen, onMenu, hint }) {
+    function Group({ title, items, color, defaultOpen, onOpen, onMenu, starSet, onStar, hint }) {
       const [open, setOpen] = useState(defaultOpen)
       if (items.length === 0) return null
       const counts = {}
@@ -962,7 +1003,7 @@ window.__ModuleLoader__.load({
           ? h(
               'div',
               { className: 'fb-session-grid' },
-              shown.map((item) => h(SessionCard, { key: `${item.tool}:${item.key}`, item, onOpen, onMenu })),
+              shown.map((item) => h(SessionCard, { key: `${item.tool}:${item.key}`, item, onOpen, onMenu, starred: Boolean(starSet && starSet.has(itemKey(item))), onStar })),
             )
           : null,
       )
@@ -1039,6 +1080,7 @@ function EmptyState({ board }) {
       // Rows removed from the board. Display-only: nothing on disk is touched.
       const [hidden, setHidden] = useState(() => loadHidden())
       const [menu, setMenu] = useState(null)
+      const [starred, setStarred] = useState(() => loadStarred())
       const board = state.data
 
       // The poller reads this flag; keeping it in the store means pausing does
@@ -1076,6 +1118,19 @@ function EmptyState({ board }) {
         [hidden, flash],
       )
 
+      const toggleStar = useCallback(
+        (item) => {
+          const key = itemKey(item)
+          const next = new Set(starred)
+          if (next.has(key)) next.delete(key)
+          else next.add(key)
+          setStarred(next)
+          saveStarred(next)
+          flash(next.has(key) ? '已标星，置顶显示' : '已取消标星')
+        },
+        [starred, flash],
+      )
+
       const restoreHidden = useCallback(() => {
         setHidden(new Set())
         saveHidden(new Set())
@@ -1096,6 +1151,11 @@ function EmptyState({ board }) {
             danger: true,
             hint: '不影响数据',
             onSelect: () => hideItem(item),
+          },
+          {
+            label: starred.has(itemKey(item)) ? '取消标星' : '标星并置顶',
+            icon: '★',
+            onSelect: () => toggleStar(item),
           },
           { separator: true },
           {
@@ -1122,14 +1182,22 @@ function EmptyState({ board }) {
               ]
             : []),
         ]
-      }, [menu, hidden, hideItem, restoreHidden, onOpen, flash])
+      }, [menu, hidden, starred, hideItem, restoreHidden, toggleStar, onOpen, flash])
 
       const filters = { query, range, status: statusFilter, tool: toolFilter }
       const filtered = useMemo(() => {
         if (!board) return []
         return filterItems(board.items, filters).filter((item) => !hidden.has(itemKey(item)))
       }, [board, query, range, statusFilter, toolFilter, hidden])
-      const bands = useMemo(() => band(filtered), [filtered])
+      const starredItems = useMemo(
+        () => filtered.filter((item) => starred.has(itemKey(item))),
+        [filtered, starred],
+      )
+      const restItems = useMemo(
+        () => filtered.filter((item) => !starred.has(itemKey(item))),
+        [filtered, starred],
+      )
+      const bands = useMemo(() => band(restItems), [restItems])
       const sortedBands = useMemo(
         () => ({
           attention: sortItems(bands.attention, sort),
@@ -1163,8 +1231,12 @@ function EmptyState({ board }) {
 
       const running = board ? board.running : 0
       const attention = board ? board.attention : 0
-      const doneCount = board ? board.items.filter((item) => item.status === 'done').length : 0
-      const failedCount = board ? board.items.filter((item) => item.status === 'failed').length : 0
+      // Counted from the rows on screen, not from the host aggregate, so the
+      // header and the bands can never disagree.
+      const doneCount = filtered.filter((item) => item.status === 'done').length
+      const failedCount = filtered.filter((item) => item.status === 'failed').length
+      const attentionCount = filtered.filter((item) => item.status === 'needs-you').length
+      const runningCount = filtered.filter((item) => item.status === 'running').length
       // "Connected" means it yielded rows: an empty store is not a failure, and
       // counting unreadable agents in the denominator would misread as broken.
       const activeTools = board ? new Set(board.items.map((item) => item.tool)).size : 0
@@ -1271,8 +1343,8 @@ function EmptyState({ board }) {
               h(
                 'div',
                 { className: 'fb-kpis' },
-                h(Kpi, { value: String(attention), label: '要你处理', color: STATUS['needs-you'].color, note: '等你拍板或需要重试' }),
-                h(Kpi, { value: String(running), label: '在跑', color: STATUS.running.color, note: '正在推进的会话' }),
+                h(Kpi, { value: String(attentionCount), label: '要你处理', color: STATUS['needs-you'].color, note: '等你拍板或需要重试' }),
+                h(Kpi, { value: String(runningCount), label: '在跑', color: STATUS.running.color, note: '正在推进的会话' }),
                 h(Kpi, { value: String(failedCount), label: '失败', color: STATUS.failed.color, note: '最近失败的会话' }),
               ),
               h(
@@ -1573,11 +1645,24 @@ function EmptyState({ board }) {
                 : null,
 
               h(Group, {
+                title: '标星',
+                items: sortItems(starredItems, sort),
+                color: '#d9a520',
+                defaultOpen: true,
+                onOpen,
+                onMenu: openMenu,
+                starSet: starred,
+                onStar: toggleStar,
+                hint: '你标过的',
+              }),
+              h(Group, {
                 title: '要你处理',
                 items: sortedBands.attention,
                 color: STATUS['needs-you'].color,
                 defaultOpen: true,
                 onMenu: openMenu,
+                starSet: starred,
+                onStar: toggleStar,
                 onOpen,
               }),
               h(Group, {
@@ -1586,6 +1671,8 @@ function EmptyState({ board }) {
                 color: STATUS.running.color,
                 defaultOpen: true,
                 onMenu: openMenu,
+                starSet: starred,
+                onStar: toggleStar,
                 onOpen,
               }),
               h(Group, {
@@ -1594,6 +1681,8 @@ function EmptyState({ board }) {
                 color: STATUS.recent.color,
                 defaultOpen: true,
                 onMenu: openMenu,
+                starSet: starred,
+                onStar: toggleStar,
                 onOpen,
               }),
               h(Group, {
@@ -1602,6 +1691,8 @@ function EmptyState({ board }) {
                 color: STATUS.idle.color,
                 defaultOpen: false,
                 onMenu: openMenu,
+                starSet: starred,
+                onStar: toggleStar,
                 onOpen,
                 hint: '点开查看',
               }),
@@ -1744,6 +1835,11 @@ function EmptyState({ board }) {
 .fb-meter i{display:block;height:100%;border-radius:999px;background:#d98324}
 .fb-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 9px;border-radius:999px;white-space:nowrap}
 .fb-status-dot{width:5px;height:5px;border-radius:50%;display:inline-block}
+/* Star: quiet until hovered, gold once set — a deliberate signal, so it stays visible. */
+.fb-star{border:0;background:none;padding:0 2px;margin-left:auto;font-size:12px;line-height:1;color:var(--fb-text-4);cursor:pointer;opacity:0;transition:opacity .12s ease,color .12s ease;font-family:inherit}
+.fb-session:hover .fb-star,.fb-star-on{opacity:1}
+.fb-star:hover{color:#d9a520}
+.fb-star-on{color:#d9a520}
 /* Right-click menu: floats above the board, clamped to the viewport. */
 .fb-menu{position:fixed;z-index:60;padding:6px;background:var(--fb-surface);border:1px solid var(--fb-line);border-radius:var(--fb-r-sm);box-shadow:0 12px 32px rgba(15,23,42,.18);display:flex;flex-direction:column;gap:1px}
 .fb-menu-item{display:flex;align-items:center;gap:8px;width:100%;padding:7px 9px;border:0;border-radius:var(--fb-r-xs);background:none;color:var(--fb-text);font-size:12px;text-align:left;cursor:pointer;font-family:inherit}
