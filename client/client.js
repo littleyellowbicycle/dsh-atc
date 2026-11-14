@@ -323,12 +323,6 @@ window.__ModuleLoader__.load({
                 h(Stat, { value: String(board.running), label: '在跑', token: STATUS.running.token }),
                 h(Stat, { value: String(board.attention), label: '等你', token: STATUS['needs-you'].token }),
                 h(Stat, { value: String(board.items.length), label: '显示' }),
-                board.spend
-                  ? h(Stat, {
-                      value: `${board.spend.symbol}${board.spend.cost.toFixed(2)}`,
-                      label: 'DSH 今日',
-                    })
-                  : null,
               ),
               h(
                 'div',

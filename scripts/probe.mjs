@@ -44,10 +44,7 @@ for (const item of board.items) {
   else bands.older.push(item)
 }
 
-console.log(
-  `\n${board.items.length} shown / ${board.total} total · attention=${board.attention} running=${board.running}` +
-    (board.spend ? ` · today ${board.spend.symbol}${board.spend.cost.toFixed(2)}` : ''),
-)
+console.log(`\n${board.items.length} shown / ${board.total} total · attention=${board.attention} running=${board.running}`)
 console.log(
   `bands: 要你处理=${bands.attention.length} 正在跑=${bands.running.length} 最近动过=${bands.recent.length} 更早=${bands.older.length}\n`,
 )

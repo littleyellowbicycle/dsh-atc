@@ -38,14 +38,9 @@ Trae / MiniMax 暂无稳定结构化字段，待补。任何一个源失败只�
 - **其它行**：复制该行的工作区路径，方便去对应工具里找
 - 行尾的状态点与相对时间来自宿主推断，不代表工具本身在跑
 
-## 今日花费
+## 为什么没有花费
 
-顶部「DSH 今日 ¥1.87」读的是 `~/.dsh/storages/cost-meter/ledger.json`（`dsh-cost-meter` 插件的账本）：
-
-- 按**本地日期**分天，一天一条记录
-- 币种跟随账本 `config.currency`：CNY 取 `costCny`、USD 取 `cost`、EUR 取 `costEur`（**不是**把美元数字套人民币符号）
-- 它是 **DSH 自己**的消费，不含 codex / opencode / WorkBuddy
-- 换 provider 会跟着变：账本按 `provider:model` 分桶（如 `volcengine:deepseek-v4.1-flash`），日总额是当天所有 provider 之和
+不做跨 agent 的花费统计。唯一有对账本的是 DSH 自己（`dsh-cost-meter` 的 `ledger.json`），codex / opencode / WorkBuddy 没有可比的记账，把其中一家的钱放进「多 Agent 汇总」会误导，所以这一栏整个去掉了。每行只显示各源**自己真的能提供**的信息（见下方「额度 / 上下文」）。
 
 ## 可调参数
 
@@ -95,8 +90,6 @@ Trae / MiniMax 暂无稳定结构化字段，待补。任何一个源失败只�
 | workbuddy | `ctx 25% · 17.3 点` | `session_usage` 的 `used/size` 与 `credit_json` |
 | codex | `volcengine` | rollout 头部的 `model_provider` |
 | dsh / opencode | 无 | 其存储不提供 per-session 成本 |
-
-顶栏「DSH 今日 ¥1.87」来自 DSH `storages/cost-meter/ledger.json`（该账本按**天**记，也按 `provider:model` 分桶，不按会话，所以只进汇总）。
 
 ## 安装（desktop profile）
 

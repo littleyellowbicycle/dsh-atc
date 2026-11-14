@@ -79,15 +79,11 @@ if (missing.length > 0) {
   console.error(`✗ rows did not render: ${missing.join(' | ')}`)
   process.exit(1)
 }
-for (const expected of ['多 Agent 看板', '在跑', '等你', 'DSH 今日']) {
+for (const expected of ['多 Agent 看板', '在跑', '等你']) {
   if (!html.includes(expected)) {
     console.error(`✗ missing text: ${expected}`)
     process.exit(1)
   }
-}
-if (board.spend && !html.includes(board.spend.symbol)) {
-  console.error('✗ spend symbol missing')
-  process.exit(1)
 }
 
 writeFileSync(
