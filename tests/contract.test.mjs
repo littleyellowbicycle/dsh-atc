@@ -207,6 +207,22 @@ test('every agent gets a mark of its own', async () => {
   assert.equal(agentGlyph('some-future-agent'), 'dashed')
 })
 
+test('every state gets a mark of its own', async () => {
+  const definition = loadClient()
+  const { STATUS_SHAPES, STATUS_ORDER } = definition.__test
+
+  // Two states sharing a mark would put them back where the colours had
+  // them: colour alone cannot carry seven states.
+  const seen = new Map()
+  for (const status of STATUS_ORDER) {
+    const shape = STATUS_SHAPES[status]
+    assert.ok(shape, `${status} has a mark`)
+    const key = JSON.stringify(shape)
+    assert.equal(seen.has(key), false, `${status} shares its mark with ${seen.get(key)}`)
+    seen.set(key, status)
+  }
+})
+
 test('a filter chip releases itself when picked twice', () => {
   const definition = loadClient()
   const { toggleFilter } = definition.__test

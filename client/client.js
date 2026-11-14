@@ -835,21 +835,31 @@ window.__ModuleLoader__.load({
           viewBox: '0 0 24 24',
           fill: 'none',
           stroke: 'currentColor',
-          strokeWidth: 1.7,
+          // The group below is scaled by 1.42, so this lands on ~1.9 once
+          // rendered: as heavy as the icons the host draws beside it.
+          strokeWidth: 1.34,
           strokeLinecap: 'round',
           strokeLinejoin: 'round',
           'aria-hidden': 'true',
         },
         // Control tower: mast, cabin, tapered leg, and two outbound sweep arcs.
-        h('path', { d: 'M12 2.4v2.6' }),
-        h('rect', { x: 9, y: 5, width: 6, height: 2.8, rx: 1 }),
-        h('path', { d: 'M10.2 7.8 9.4 15M13.8 7.8 14.6 15' }),
-        h('path', { d: 'M8.6 15h6.8' }),
-        h('path', { d: 'M16.9 6.2a4.2 4.2 0 0 1 0 6.1' }),
-        h('path', { d: 'M19.1 4.1a7.4 7.4 0 0 1 0 10.3', opacity: 0.55 }),
-        attention > 0
-          ? h('circle', { cx: 19.6, cy: 4.4, r: 3, fill: 'var(--dsw-alias-state-warn-primary)', stroke: 'none' })
-          : null,
+        //
+        // As authored the drawing filled barely half of the box and sat off to
+        // the right, so the row read as a smaller icon next to the host's.
+        // The transform scales it up and centres it in the viewBox.
+        h(
+          'g',
+          { transform: 'translate(-9.21 -0.91) scale(1.42)' },
+          h('path', { d: 'M12 2.4v2.6' }),
+          h('rect', { x: 9, y: 5, width: 6, height: 2.8, rx: 1 }),
+          h('path', { d: 'M10.2 7.8 9.4 15M13.8 7.8 14.6 15' }),
+          h('path', { d: 'M8.6 15h6.8' }),
+          h('path', { d: 'M16.9 6.2a4.2 4.2 0 0 1 0 6.1' }),
+          h('path', { d: 'M19.1 4.1a7.4 7.4 0 0 1 0 10.3', opacity: 0.55 }),
+          attention > 0
+            ? h('circle', { cx: 19.8, cy: 3.8, r: 2.6, fill: 'var(--dsw-alias-state-warn-primary)', stroke: 'none' })
+            : null,
+        ),
       )
     }
 
@@ -1968,6 +1978,9 @@ function EmptyState({ board }) {
 .fb-heat-legend{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--fb-text-4);margin-top:14px}
 .fb-heat-legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
 .fb-glyph{display:inline-block;flex:none;color:var(--fb-agent-color,currentColor)}
+/* Lined marks for the states; the agent logos are filled, so the two
+   dimensions never read as the same kind of thing. */
+.fb-status-glyph{display:inline-block;flex:none;color:var(--fb-status-color,currentColor)}
 .fb-agent-bars{display:flex;flex-direction:column;gap:8px}
 .fb-agent-bar{display:flex;align-items:center;gap:9px;font-size:12px}
 .fb-agent-bar-name{width:76px;flex:none;color:var(--fb-text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1978,7 +1991,6 @@ function EmptyState({ board }) {
 .fb-agent-bar-empty{font-size:12px;color:var(--fb-text-4)}
 .fb-agent-strip{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:7px}
 .fb-agent-strip-item{display:inline-flex;align-items:center;flex:none}
-.fb-legend-dot{width:8px;height:8px;border-radius:2px;display:inline-block;flex:none}
 .fb-statusbar{margin-bottom:4px}
 .fb-statusbar-track{display:flex;height:8px;border-radius:999px;overflow:hidden;background:var(--fb-line-soft)}
 .fb-statusbar-seg{height:100%;display:block}
@@ -1992,13 +2004,17 @@ function EmptyState({ board }) {
 .fb-search:focus-within{border-color:var(--fb-blue,#4c7cf3)}
 .fb-search input{border:none;outline:none;background:transparent;font-family:inherit;font-size:12px;color:var(--fb-text);width:100%}
 .fb-search input::placeholder{color:var(--fb-text-4)}
-.fb-filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:12px}
-.fb-filter-label{font-size:10.5px;color:var(--fb-text-4);margin-right:1px;user-select:none;white-space:nowrap}
+.fb-filters{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
+.fb-filter-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+/* Fixed label width: the chips of both rows start at the same x, so the two
+   dimensions line up instead of stepping in and out. */
+.fb-filter-label{width:32px;flex:none;font-size:10.5px;color:var(--fb-text-4);user-select:none;white-space:nowrap}
 .fb-chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:3px 10px;border-radius:var(--fb-r-sm);border:1px solid var(--fb-line);background:var(--fb-surface);color:var(--fb-text-2);cursor:pointer;font-family:inherit;transition:background .15s,color .15s,border-color .15s}
 .fb-chip:hover{background:var(--fb-hover)}
 .fb-chip-active{background:var(--fb-text);border-color:var(--fb-text);color:var(--fb-surface)}
 .fb-chip-active:hover{background:var(--fb-text);opacity:.9}
 .fb-chip-active .fb-glyph{color:inherit}
+.fb-chip-active .fb-status-glyph{color:inherit}
 .fb-chip-off{color:var(--fb-text-4);border-style:dashed;cursor:default}
 .fb-chip-off:hover{background:transparent}
 .fb-chip-muted{opacity:.75;cursor:default}
@@ -2033,7 +2049,6 @@ function EmptyState({ board }) {
 .fb-meter{width:52px;height:4px;border-radius:999px;background:var(--fb-line-soft);overflow:hidden;flex:none;display:inline-block}
 .fb-meter i{display:block;height:100%;border-radius:999px;background:#d98324}
 .fb-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 9px;border-radius:999px;white-space:nowrap}
-.fb-status-dot{width:5px;height:5px;border-radius:50%;display:inline-block}
 /* Star: quiet until hovered, gold once set — a deliberate signal, so it stays visible. */
 .fb-star{border:0;background:none;padding:0 2px;margin-left:auto;font-size:12px;line-height:1;color:var(--fb-text-4);cursor:pointer;opacity:0;transition:opacity .12s ease,color .12s ease;font-family:inherit}
 .fb-session:hover .fb-star,.fb-star-on{opacity:1}
@@ -2114,7 +2129,7 @@ function EmptyState({ board }) {
       inject,
       apply,
       /** Seams for the offline render check; the host never reads these. */
-      __test: { FleetPage, store, refresh, toggleFilter, AGENT_GLYPH, agentGlyph },
+      __test: { FleetPage, store, refresh, toggleFilter, AGENT_GLYPH, agentGlyph, STATUS_SHAPES, STATUS_ORDER },
     }
   },
 })
