@@ -1,0 +1,64 @@
+{
+  "name": "dsh-fleet-board",
+  "version": "0.1.0",
+  "description": "Multi-agent fleet board for DeepSeek Harness: one right-sidebar tab showing what every local agent (DSH, codex, opencode, WorkBuddy) is doing — zero token, host-side inference.",
+  "type": "module",
+  "main": "./lib/index.js",
+  "license": "MIT",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "sidebar",
+    "multi-agent",
+    "attention",
+    "fleet",
+    "session"
+  ],
+  "engines": {
+    "node": ">=22.13.0",
+    "dsh": ">=0.2.0-0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    }
+  },
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./client/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "client",
+    "cordis.patch.yml",
+    "fleet-board.example.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "node --check lib/index.js && node --check lib/collect.mjs && node --check client/client.js",
+    "test": "node --test tests/contract.test.mjs",
+    "probe": "node scripts/probe.mjs",
+    "render-check": "node scripts/render-check.mjs",
+    "live-check": "node scripts/live-check.mjs",
+    "prepublishOnly": "npm run check && npm test"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "devDependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "ws": "^8.23.0"
+  }
+}
