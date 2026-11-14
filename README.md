@@ -1,6 +1,6 @@
-# dsh-fleet-board
+# Agent 空管中心（dsh-atc）
 
-DeepSeek Harness 的多 Agent 看板：在**左侧栏**加一行（和「插件」「自动化任务」并列），点开就是全屏面板，一屏看完**本机所有 agent** 正在干什么。
+DeepSeek Harness 的多 Agent 空管中心：在**左侧栏**加一行（和「插件」「自动化任务」并列），点开就是全屏面板，一屏看完**本机所有 agent** 正在干什么。
 
 零 token —— 宿主侧只读本地会话存储、纯本地推断状态，不经过任何模型。
 
@@ -24,7 +24,7 @@ Trae / MiniMax 暂无稳定结构化字段，待补。任何一个源失败只�
 本机能有 500+ 条历史会话，**平铺等于没有信息**。所以整页从「一眼看全貌」开始，再落到「谁在等我」：
 
 ```
-┌ 多 Agent 看板  [本地推断·零 token]        更新于 11:02  [今天|近7天|近30天|全部] [⟳ 刷新]
+┌ Agent 空管中心  [本地推断·零 token]        更新于 11:02  [今天|近7天|近30天|全部] [⟳ 刷新]
 ├ 6 个 KPI：在跑 3 · 等你 0 · 失败 0 · 完成 38 · 本机会话 524 · 接入的 agent 4/4
 ├ 活跃度（热力图）                │ Agent 分布（环形图 + 占比图例）
 ├ 状态分布（分段条：在跑 / 完成 / 刚停 / 空闲）
@@ -113,8 +113,8 @@ Copy-Item "$env:USERPROFILE\.dsh\profiles\desktop\package.json" `
           "$env:USERPROFILE\.dsh\profiles\desktop\package.json.bak"
 
 # 2. 在 package.json 里加两处
-#    dependencies."dsh-fleet-board" = "link:/path/to/dsh-fleet-board"
-#    dsh.profile.bundles 追加 "dsh-fleet-board"
+#    dependencies."dsh-atc" = "link:/path/to/dsh-atc"
+#    dsh.profile.bundles 追加 "dsh-atc"
 
 # 3. 用 runtime 自带 pnpm 装（不要用系统 pnpm）
 $rt = "$env:USERPROFILE\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies"
@@ -126,7 +126,7 @@ cd "$env:USERPROFILE\.dsh\profiles\desktop"
 
 ## 使用
 
-左侧栏（和「插件」「自动化任务」并列）会多一行「**看板**」，点开就是面板。图标右上角出现小圆点表示有需要你处理的事。
+左侧栏（和「插件」「自动化任务」并列）会多一行「**空管**」，点开就是面板。图标右上角出现小圆点表示有需要你处理的事。
 
 ## 本地开发
 
@@ -144,14 +144,14 @@ node --check lib/index.js     # 语法检查
 ```powershell
 # 1. 建一个独立测试 profile（CLI 可管理，desktop 不行）
 dsh --profile fleet-test --from-default-profile web --dump-config
-dsh plugin --profile fleet-test add "link:/path/to/dsh-fleet-board"
+dsh plugin --profile fleet-test add "link:/path/to/dsh-atc"
 
 # 2. 起一个独立 web 实例
 dsh --profile fleet-test --port 60200 --no-open
 
-# 3. 无头 Edge 打开、点开左侧栏的「看板」、截图
+# 3. 无头 Edge 打开、点开左侧栏的「空管」、截图
 node scripts/live-check.mjs 'http://127.0.0.1:60200/?token=<token>' `
-  '--click=打开右侧边栏' '--click=多 Agent 看板'
+  '--click=空管'
 ```
 
 `live-check.png` 是当次面板截图，`__dshFleetBoard.registered` 为 true 表示客户端在真宿主里注册成功。

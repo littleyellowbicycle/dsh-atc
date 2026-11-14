@@ -1,17 +1,17 @@
 {
-  "name": "dsh-fleet-board",
-  "version": "0.3.0",
-  "description": "Multi-agent fleet board for DeepSeek Harness: one right-sidebar tab showing what every local agent (DSH, codex, opencode, WorkBuddy) is doing — zero token, host-side inference.",
+  "name": "dsh-atc",
+  "version": "0.4.0",
+  "description": "Agent 空管中心 for DeepSeek Harness: one sidebar panel listing every local agent session (DSH, codex, opencode, WorkBuddy, Gemini) with attention-first grouping and folded history — zero token, host-side inference.",
   "type": "module",
   "main": "./lib/index.js",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/littleyellowbicycle/dsh-fleet-board.git"
+    "url": "git+https://github.com/littleyellowbicycle/dsh-atc.git"
   },
-  "homepage": "https://github.com/littleyellowbicycle/dsh-fleet-board#readme",
+  "homepage": "https://github.com/littleyellowbicycle/dsh-atc#readme",
   "bugs": {
-    "url": "https://github.com/littleyellowbicycle/dsh-fleet-board/issues"
+    "url": "https://github.com/littleyellowbicycle/dsh-atc/issues"
   },
   "keywords": [
     "deepseek-harness",

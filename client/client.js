@@ -11,7 +11,7 @@
  */
 
 window.__ModuleLoader__.load({
-  id: 'dsh-fleet-board',
+  id: 'dsh-atc',
   factory(require) {
     const React = require('react')
     const { useCallback, useEffect, useMemo, useState } = React
@@ -398,11 +398,15 @@ window.__ModuleLoader__.load({
           strokeLinejoin: 'round',
           'aria-hidden': 'true',
         },
-        h('rect', { x: 3, y: 4, width: 18, height: 6, rx: 2 }),
-        h('rect', { x: 3, y: 14, width: 11, height: 6, rx: 2 }),
-        h('circle', { cx: 18.5, cy: 17, r: 2.5, fill: 'currentColor', stroke: 'none', opacity: 0.55 }),
+        // Control tower: mast, cabin, tapered leg, and two outbound sweep arcs.
+        h('path', { d: 'M12 2.4v2.6' }),
+        h('rect', { x: 9, y: 5, width: 6, height: 2.8, rx: 1 }),
+        h('path', { d: 'M10.2 7.8 9.4 15M13.8 7.8 14.6 15' }),
+        h('path', { d: 'M8.6 15h6.8' }),
+        h('path', { d: 'M16.9 6.2a4.2 4.2 0 0 1 0 6.1' }),
+        h('path', { d: 'M19.1 4.1a7.4 7.4 0 0 1 0 10.3', opacity: 0.55 }),
         attention > 0
-          ? h('circle', { cx: 20, cy: 5, r: 3.4, fill: 'var(--dsw-alias-state-warn-primary)', stroke: 'none' })
+          ? h('circle', { cx: 19.6, cy: 4.4, r: 3, fill: 'var(--dsw-alias-state-warn-primary)', stroke: 'none' })
           : null,
       )
     }
@@ -735,7 +739,7 @@ window.__ModuleLoader__.load({
             h(
               'div',
               { className: 'fb-title' },
-              h('h1', { className: 'fb-h1' }, '多 Agent 看板'),
+              h('h1', { className: 'fb-h1' }, 'Agent 空管中心'),
               h(
                 'span',
                 { className: 'fb-badge' },
@@ -1269,7 +1273,7 @@ window.__ModuleLoader__.load({
               name: 'sidebar.panellist',
               id: PANEL_ID,
               order: 30,
-              label: () => '看板',
+              label: () => '空管',
             },
             PanelIcon,
           ),
@@ -1284,7 +1288,7 @@ window.__ModuleLoader__.load({
     }
 
     return {
-      name: 'dsh-fleet-board',
+      name: 'dsh-atc',
       inject,
       apply,
       /** Seams for the offline render check; the host never reads these. */

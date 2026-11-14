@@ -1,4 +1,4 @@
 # One package owns one inserted row. Configure the row; do not insert it twice.
 - insert:
     - id: fleet-board
-      name: 'dsh-fleet-board'
+      name: 'dsh-atc'

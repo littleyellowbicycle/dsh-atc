@@ -18,7 +18,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 test('host registers one route and answers the board payload', async () => {
   const host = await import(pathToFileURL(join(root, 'lib', 'index.js')).href)
-  assert.equal(host.name, 'dsh-fleet-board')
+  assert.equal(host.name, 'dsh-atc')
 
   const routes = []
   const webCtx = {
@@ -120,7 +120,7 @@ function loadClient() {
   sandbox.window = {
     __ModuleLoader__: {
       load: (loaded) => {
-        assert.equal(loaded.id, 'dsh-fleet-board')
+        assert.equal(loaded.id, 'dsh-atc')
         definition = loaded.factory((spec) => {
           if (spec === 'react') return ReactForBundle
           throw new Error(`unexpected require(${spec})`)
@@ -136,7 +136,7 @@ function loadClient() {
 
 test('client registers a sidebar row and its main panel page', () => {
   const definition = loadClient()
-  assert.equal(definition.name, 'dsh-fleet-board')
+  assert.equal(definition.name, 'dsh-atc')
   // The surface is waited for inside `apply`, so the plugin declares no hard
   // dependency (a host without the sidebar must still boot).
   assert.deepEqual([...definition.inject], [])
@@ -165,7 +165,7 @@ test('client registers a sidebar row and its main panel page', () => {
   assert.ok(row, 'sidebar.panellist registered')
   assert.equal(row.options.id, 'fleet-board')
   assert.equal(typeof row.options.label, 'function')
-  assert.equal(row.options.label(), '看板')
+  assert.equal(row.options.label(), '空管')
   assert.equal(typeof row.component, 'function', 'icon is the second positional argument')
 
   assert.ok(panel, 'main panel registered')
