@@ -127,10 +127,13 @@ Get-FileHash .\\${file} -Algorithm SHA256
 不 clone 也能直接下这一个文件（实测 206，可断点续传）：
 
 \`\`\`powershell
-Invoke-WebRequest -Uri 'https://gitcode.com/littleyellowbicycle/blueyellow-sync/raw/main/packages/${name}-${version}/${file}' -OutFile ${file}
+# 不要用网页的 raw 链接：对二进制它返回的是一张 6 kB 的 HTML 页面
+# （\`gitcode.com/<owner>/<repo>/raw/main/...\` 和 \`raw.gitcode.com/...\` 都一样）。
+# 二进制只有 clone 才能拿到正确字节。
+git clone --depth 1 https://gitcode.com/littleyellowbicycle/blueyellow-sync.git
 \`\`\`
 
-\`raw.gitcode.com/<owner>/<repo>/main/<path>\` 是另一种写法。注意别用 \`raw.gitcode.com/.../raw/main/...\`（多一段 \`/raw/\` 会 403）。
+下完以后核对大小和 SHA-256 再装——克隆下来的是不是原包，用这两行就能确认。
 
 ## 安装
 
@@ -140,12 +143,16 @@ Invoke-WebRequest -Uri 'https://gitcode.com/littleyellowbicycle/blueyellow-sync/
 dsh plugin add ${name}@${version}
 \`\`\`
 
-### 离线：从本目录的 tgz 装
+### 离线：从本目录的 tgz 装（推荐）
 
 \`\`\`powershell
-# 先 clone 本仓库，进到本目录
-dsh plugin add <本目录的绝对路径>/${file}
+git clone --depth 1 https://gitcode.com/littleyellowbicycle/blueyellow-sync.git
+dsh plugin add <clone 下来的绝对路径>/packages/${name}-${version}/${file}
 \`\`\`
+
+装完重启 DSH，左侧栏出现「空管」。
+
+**一个前提**：目标 profile 的 \`dsh.profile.bundles\` 里要有 \`@deepseek-ai/dsh-web-app\`（正常的 web profile 本来就有）。如果是为这个插件**新建**的空 profile，它只会写进 \`@deepseek-ai/dsh-base\` 和 \`${name}\`，web 模式起不来——补上那一行再启动即可。
 
 实测可用（\`dsh plugin add\` 接受本地 tgz 绝对路径，内部走 pnpm 的 file 依赖）。装完重启 DSH，左侧栏出现「空管」。
 

@@ -2,3 +2,11 @@ node_modules/
 *.log
 render-check.html
 live-check.png
+
+# One-off comparison shots made while tuning icons and spacing. They are working
+# artefacts: the only pictures the repo keeps are docs/preview-board.png (the
+# synthetic README screenshot) and assets/ (the plugin icon).
+/shot-*.png
+/zoom-*.png
+/ref-*.png
+render-narrow.html
