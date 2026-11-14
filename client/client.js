@@ -867,7 +867,47 @@ window.__ModuleLoader__.load({
       )
     }
 
-    /** Loading placeholder that mirrors the KPI grid shape. */
+    /**
+ * No sessions anywhere. Saying "nothing here" is not enough after a first
+ * install: the reader needs to know what was looked for, and whether something
+ * exists that the board could still read.
+ */
+function EmptyState({ board, onRescan }) {
+  const agents = board.agents || []
+  const found = agents.filter((agent) => agent.parsed)
+  const unreadable = agents.filter((agent) => !agent.parsed)
+  const discovery = board.discovery || {}
+  const installable = discovery.installableNames || []
+  return h(
+    'div',
+    { className: 'fb-empty' },
+    h('div', { className: 'fb-empty-mark' }, h(AgentGlyph, { tool: 'dsh', size: 28 })),
+    h('h2', { className: 'fb-empty-title' }, '还没有可显示的会话'),
+    h(
+      'p',
+      { className: 'fb-empty-sub' },
+      found.length > 0
+        ? `找到了 ${found.length} 个 agent，但还没有它们的会话记录。`
+        : '还没有发现任何 agent 的会话记录。',
+    ),
+    h(
+      'div',
+      { className: 'fb-empty-facts' },
+      h('span', null, `探测 ${agents.length || '—'} 个 agent`),
+      unreadable.length > 0 ? h('span', null, `${unreadable.length} 个读不了`) : null,
+      installable.length > 0
+        ? h('span', { className: 'fb-empty-new' }, `另有 ${installable.length} 个可接入：${installable.join('、')}`)
+        : null,
+    ),
+    h(
+      'button',
+      { type: 'button', className: 'fb-btn', onClick: () => onRescan() },
+      '重新扫描',
+    ),
+  )
+}
+
+/** Loading placeholder that mirrors the KPI grid shape. */
     function Skeleton() {
       return h(
         'div',
@@ -1347,6 +1387,10 @@ window.__ModuleLoader__.load({
                   : null,
               ),
 
+              board.items.length === 0
+                ? h(EmptyState, { board, onRescan: refresh })
+                : null,
+
               filtered.length === 0
                 ? h('div', { className: 'fb-clear' }, '当前筛选下没有会话')
                 : null,
@@ -1517,6 +1561,12 @@ window.__ModuleLoader__.load({
 .fb-meter i{display:block;height:100%;border-radius:999px;background:#d98324}
 .fb-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 9px;border-radius:999px;white-space:nowrap}
 .fb-status-dot{width:5px;height:5px;border-radius:50%;display:inline-block}
+.fb-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:56px 24px;margin:8px 0 24px;border:1px dashed var(--fb-line);border-radius:var(--fb-r-md);text-align:center}
+.fb-empty-mark{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:var(--fb-fill);color:var(--fb-text-3);margin-bottom:2px}
+.fb-empty-title{margin:0;font-size:14px;font-weight:600;color:var(--fb-text)}
+.fb-empty-sub{margin:0;font-size:12px;color:var(--fb-text-3);max-width:420px;line-height:1.6}
+.fb-empty-facts{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;font-size:11px;color:var(--fb-text-4);margin:6px 0 10px}
+.fb-empty-new{color:var(--fb-text-2)}
 .fb-skel{height:11px;border-radius:5px;background:linear-gradient(90deg,#eef0f3,#f7f8fa,#eef0f3);background-size:200% 100%;animation:fb-sh 1.4s linear infinite}
 @keyframes fb-sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .fb-empty,.fb-error{padding:14px 2px;font-size:12px;color:var(--fb-text-3)}
