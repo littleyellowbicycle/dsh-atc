@@ -100,6 +100,16 @@ DeepSeek Harness 的 Agent 空管中心：在**左侧栏**加一行（和「插�
 
 不做跨 agent 的花费统计。唯一有对账本的是 DSH 自己（`dsh-cost-meter` 的 `ledger.json`），codex / opencode / WorkBuddy 没有可比的记账，把其中一家的钱放进「多 Agent 汇总」会误导，所以这一栏整个去掉了。每行只显示各源**自己真的能提供**的信息（见下方「额度 / 上下文」）。
 
+## 发现与自动接入
+
+插件认识的工具写在 `lib/sources.mjs` 里（声明式 spec：哪些表名、哪些列名算「会话库」）。除此之外，宿主启动 12 秒后会在后台遍历一次应用目录，把没见过的库按**内容**打分并匹配 spec：
+
+- 形状完全对上（表名 + id/时间列都在）→ **自动并入看板**，行上标 `自动发现`，不需要你做任何事
+- 只是「有张 sessions 表」→ 不并入，也不猜，只在空状态里列为候选
+- 文件头不是 SQLite（加密容器）→ 标「读不了」
+
+结果缓存在 `$DSH_HOME/atc-discovered.json`，6 小时过期；轮询（每 5 秒）**从不触发扫描**，只读那 9 条固定路径。
+
 ## 可调参数
 
 宿主每次轮询都会读 `$DSH_HOME/atc.json`（不存在就用默认值），**改完不用重启**：
@@ -116,6 +126,7 @@ DeepSeek Harness 的 Agent 空管中心：在**左侧栏**加一行（和「插�
 | `runningSeconds` | 无自带状态时，多少秒内有动静算「在跑」 |
 | `recentMinutes` | 「最近动过 / 更早」的分界 |
 | `attentionHours` | 失败态只在这么多小时内算「要你处理」，更早的失败是历史 |
+| `autoDiscover` | 发现扫描命中已知形状的库时，是否自动并入看板（默认 `true`） |
 
 模板见 [atc.example.json](atc.example.json)。
 

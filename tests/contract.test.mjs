@@ -244,3 +244,33 @@ test('statusFromTurn trusts the turn boundaries over file age', async () => {
   assert.equal(statusFromTurn({ lastStart: 0, lastEnd: null }, now - 5 * 60_000, now), 'recent')
   assert.equal(statusFromTurn({ lastStart: 0, lastEnd: null }, now - 30_000, now), 'running')
 })
+
+test('a discovered store is read without any collector of its own', async () => {
+  const { mkdtempSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join: joinPath } = await import('node:path')
+  const { DatabaseSync } = await import('node:sqlite')
+  const { collectBoard } = await import(pathToFileURL(join(root, 'lib', 'collect.mjs')).href)
+
+  const dir = mkdtempSync(joinPath(tmpdir(), 'atc-discover-'))
+  const store = joinPath(dir, 'made-up-agent.db')
+  const db = new DatabaseSync(store)
+  // Exactly the shape `opencode-like` describes, under a tool nobody wrote code for.
+  db.exec('CREATE TABLE session (id TEXT PRIMARY KEY, title TEXT, directory TEXT, time_updated INTEGER)')
+  db.exec('CREATE TABLE message (id TEXT, session_id TEXT, time_created INTEGER)')
+  const now = Date.now()
+  db.prepare('INSERT INTO session VALUES (?, ?, ?, ?)').run('s1', '自动接入的会话', 'D:/work/proj', now - 60_000)
+  db.prepare('INSERT INTO message VALUES (?, ?, ?)').run('m1', 's1', now - 60_000)
+  db.close()
+
+  const board = await collectBoard([{ tool: 'madeup', store, specId: 'opencode-like' }])
+  const rows = board.items.filter((item) => item.tool === 'madeup')
+  assert.equal(rows.length, 1, 'the discovered store produced a row')
+  assert.equal(rows[0].title, '自动接入的会话')
+  assert.equal(rows[0].workspace, 'D:/work/proj')
+  assert.equal(rows[0].auto, true, 'row is marked as discovered')
+
+  // A store whose shape matches but whose columns are gone is skipped, not guessed.
+  const wrong = await collectBoard([{ tool: 'broken', store, specId: 'runtime-state' }])
+  assert.equal(wrong.items.filter((item) => item.tool === 'broken').length, 0)
+})
