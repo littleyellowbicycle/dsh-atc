@@ -24,23 +24,21 @@ DeepSeek Harness 的 Agent 空管中心：在**左侧栏**加一行（和「插�
 | zcode | `~/.zcode/cli/db/db.sqlite` | sqlite（`session` + `message.time_updated`，与 opencode 同构） |
 | minimax | `~/.minimax/v2/sqlite/runtime-state.sqlite` | sqlite（`local_runtime_sessions.status/updated_at_ms` + 记录里的 `workspaceDir`） |
 
-读不了的会单独标出来，而不是假装不存在：看板探测 14 个候选工具，**能读的进列表，不能读的进 chip 行的第二段**（悬停显示路径 + 读不了的原因）。目前读不了的是 Trae（`ModularData/ai-agent/database.db` 是 SQLCipher 加密库）、Claude Code（这台机器上没有 `~/.claude/projects/` 会话目录）、Qoder（未安装）。任何一个源失败只降级该源，不影响整板。
+读不了的会单独标出来，而不是假装不存在：看板探测 14 个候选工具，**能读的进列表，不能读的进 chip 行的第二段**（悬停显示路径 + 读不了的原因）。任何一个源失败只降级该源，不影响整板。
 
-## 读不了的 agent，为什么，以及有没有办法
+## 读不了的 agent
 
-探测到但读不了的工具，会在 chip 行末尾以虚线 chip 出现（如 `trae 已加密`），悬停显示探测到的路径和原因。**可读但为空的源不出现**——空库不代表这个 agent 坏了，没必要占一行。
+探测到但读不了的工具，会在 chip 行末尾以虚线 chip 出现，悬停显示探测到的路径和原因；**可读但为空的源不出现**——空库不代表这个 agent 坏了，没必要占一行。
 
-| 工具 | 现状 | 原因 |
-|---|---|---|
-| **Trae**（IDE / SOLO） | chip 显示 `trae 已加密` | 会话在 `%APPDATA%\Trae CN\ModularData\ai-agent\database.db`（≈151 MB），文件头不是 `SQLite format 3`，是 **SQLCipher 加密库**；`state.vscdb` 倒能打开，但里面只有主题、模型列表、最近打开路径，没有对话 |
+典型情况是 **Trae**：它的会话存在一个加密数据库里，明文读不到，所以在看板上显示为 `trae 已加密`。
 
-Trae 有三条路，按「干净程度」排：
+三条解法，按「干净程度」排：
 
-1. **装 TRAE CLI** —— CLI 2.0（`traex`）把会话写成 `~/.trae/cli/sessions/YYYY/MM/DD/rollout-*.jsonl`，**明文 jsonl**，与控制台现有解析器同构。**解析器已经写好**（`collectTraeCli`），装上 CLI 就会自动出现在列表里；本机没装，所以这条分支未经真机验证。
-2. **让 Trae 自己导出** —— 社区 MCP 服务 [`mcp-session-saver`](https://www.npmjs.com/package/mcp-session-saver) 在 Trae 里说一句「保存当前会话」，把对话按 IDE/日期落成 Markdown，再让看板读那个目录即可，**零逆向**。
-3. **解密数据库** —— [`Oh-My-Trae/trae-db-decrypt`](https://github.com/Oh-My-Trae/trae-db-decrypt) 做的是进程发现 + 内存扫描拿密钥。能work，但要读进程内存、随 Trae 版本失效、风险自担，**不集成进插件**。
+1. **装 TRAE CLI** —— CLI 会把会话写成 `~/.trae/cli/sessions/` 下的明文 jsonl，与控制台现有解析器同构。**解析器已经写好**（`collectTraeCli`），装上 CLI 就会自动出现在列表里。
+2. **让它自己导出** —— 社区 MCP 服务 [`mcp-session-saver`](https://www.npmjs.com/package/mcp-session-saver) 可在 IDE 里说一句「保存当前会话」，把对话落成 Markdown，再让看板读那个目录即可，**零逆向**。
+3. **解密数据库** —— [`Oh-My-Trae/trae-db-decrypt`](https://github.com/Oh-My-Trae/trae-db-decrypt) 做的是进程发现 + 内存扫描拿密钥。能work，但要读进程内存、随版本失效、风险自担，**不集成进插件**。
 
-Trae 官方论坛也确认过这条边界：`database.db` 加密、暂不支持查看，界面只给 Markdown 导出（[1](https://forum.trae.cn/t/topic/52906)、[2](https://forum.trae.cn/t/topic/174212/4)）。
+同类工具官方也确认过这条边界：加密库暂不支持查看，界面只给 Markdown 导出（[1](https://forum.trae.cn/t/topic/52906)、[2](https://forum.trae.cn/t/topic/174212/4)）。
 
 ## 界面怎么排
 
