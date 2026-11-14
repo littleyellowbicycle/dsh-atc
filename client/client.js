@@ -198,6 +198,126 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * Status marks, one shape per state.
+     *
+     * The agents now carry real brand logos, which leaves colour as the only
+     * thing telling the states apart — the very thing we just got rid of on
+     * the agent side. These marks are strokes, the brand logos are fills, so
+     * the two dimensions never read as the same kind of thing: filled = who,
+     * lined = what state.
+     */
+    const STATUS_SHAPES = {
+      running: [
+        {
+          tag: 'path',
+          attrs: {
+            d: 'M4.4 2.9 9.2 6l-4.8 3.1z',
+            stroke: 'currentColor',
+            strokeWidth: 1.5,
+            fill: 'none',
+            strokeLinejoin: 'round',
+          },
+        },
+      ],
+      'needs-you': [
+        {
+          tag: 'path',
+          attrs: {
+            d: 'M6 2.3v4.3',
+            stroke: 'currentColor',
+            strokeWidth: 1.6,
+            fill: 'none',
+            strokeLinecap: 'round',
+          },
+        },
+        { tag: 'circle', attrs: { cx: 6, cy: 9.3, r: 0.8, fill: 'currentColor' } },
+      ],
+      failed: [
+        {
+          tag: 'path',
+          attrs: {
+            d: 'M3.7 3.7 8.3 8.3M8.3 3.7 3.7 8.3',
+            stroke: 'currentColor',
+            strokeWidth: 1.6,
+            fill: 'none',
+            strokeLinecap: 'round',
+          },
+        },
+      ],
+      done: [
+        {
+          tag: 'path',
+          attrs: {
+            d: 'M2.9 6.3 4.9 8.4 9.1 3.7',
+            stroke: 'currentColor',
+            strokeWidth: 1.7,
+            fill: 'none',
+            strokeLinecap: 'round',
+            strokeLinejoin: 'round',
+          },
+        },
+      ],
+      stopped: [
+        { tag: 'circle', attrs: { cx: 6, cy: 6, r: 4.2, stroke: 'currentColor', strokeWidth: 1.5, fill: 'none' } },
+        {
+          tag: 'path',
+          attrs: {
+            d: 'M3.4 3.4 8.6 8.6',
+            stroke: 'currentColor',
+            strokeWidth: 1.5,
+            fill: 'none',
+            strokeLinecap: 'round',
+          },
+        },
+      ],
+      recent: [
+        { tag: 'circle', attrs: { cx: 6, cy: 6, r: 4.2, stroke: 'currentColor', strokeWidth: 1.4, fill: 'none' } },
+        {
+          tag: 'path',
+          attrs: {
+            d: 'M6 3.5V6l1.9 1.3',
+            stroke: 'currentColor',
+            strokeWidth: 1.4,
+            fill: 'none',
+            strokeLinecap: 'round',
+            strokeLinejoin: 'round',
+          },
+        },
+      ],
+      idle: [
+        {
+          tag: 'path',
+          attrs: {
+            d: 'M9.4 8.8A4.1 4.1 0 0 1 4.2 3.6a4.3 4.3 0 1 0 5.2 5.2z',
+            stroke: 'currentColor',
+            strokeWidth: 1.4,
+            fill: 'none',
+            strokeLinejoin: 'round',
+          },
+        },
+      ],
+    }
+
+    /** One state mark, in the colour of the state it stands for. */
+    function StatusGlyph({ status, size = 12, color }) {
+      const parts = STATUS_SHAPES[status] || STATUS_SHAPES.idle
+      return h(
+        'svg',
+        {
+          className: 'fb-status-glyph',
+          width: size,
+          height: size,
+          viewBox: '0 0 12 12',
+          fill: 'none',
+          'aria-hidden': 'true',
+          focusable: 'false',
+          style: color ? { '--fb-status-color': color } : undefined,
+        },
+        parts.map((part, index) => h(part.tag, { key: index, ...part.attrs })),
+      )
+    }
+
+    /**
      * Only these states are worth a filter chip. 刚停 / 无动静 are catch-all
      * buckets: they only say "nothing happened lately", and filtering by them
      * just reproduces the 更早 band.
@@ -400,6 +520,17 @@ window.__ModuleLoader__.load({
 
     /** Status order used by the stacked bar and the legend. */
     const STATUS_ORDER = ['running', 'needs-you', 'failed', 'done', 'stopped', 'recent', 'idle']
+
+    /**
+     * Windows for the agent distribution. "All" counts history, so whoever keeps
+     * the most old sessions wins — true but useless. A rolling window answers
+     * the question a dashboard is for: who has been working lately.
+     */
+    const AGENT_SCOPES = [
+      { key: 'd1', label: '近 24h', ms: DAY },
+      { key: 'd7', label: '近 7 天', ms: 7 * DAY },
+      { key: 'all', label: '全部', ms: Infinity },
+    ]
 
     /** Time windows; `all` keeps the historical default of showing everything. */
     const RANGES = [
@@ -762,8 +893,8 @@ window.__ModuleLoader__.load({
      * bar: the shape says who, the bar says how much, and the hue only
      * repeats what the shape already said.
      */
-    function AgentBars({ rows, total }) {
-      if (rows.length === 0) return h('div', { className: 'fb-agent-bar-empty' }, '没有数据')
+    function AgentBars({ rows, total, empty }) {
+      if (rows.length === 0) return h('div', { className: 'fb-agent-bar-empty' }, empty ?? '没有数据')
       const max = Math.max(...rows.map((row) => row.value))
       return h(
         'div',
@@ -953,7 +1084,7 @@ window.__ModuleLoader__.load({
               style: { color: status.color, background: status.soft },
               title: status.hint,
             },
-            h('i', { className: 'fb-status-dot', style: { background: status.color } }),
+            h(StatusGlyph, { status: item.status, size: 11 }),
             status.label,
           ),
           ctx
@@ -1106,6 +1237,7 @@ function EmptyState({ board }) {
       const [hidden, setHidden] = useState(() => loadHidden())
       const [menu, setMenu] = useState(null)
       const [starred, setStarred] = useState(() => loadStarred())
+      const [agentScope, setAgentScope] = useState('d1')
       const board = state.data
 
       // The poller reads this flag; keeping it in the store means pausing does
@@ -1234,7 +1366,13 @@ function EmptyState({ board }) {
         [bands, sort],
       )
 
-      const tools = useMemo(() => toolBreakdown(filtered), [filtered])
+      const agentWindow = AGENT_SCOPES.find((entry) => entry.key === agentScope) ?? AGENT_SCOPES[0]
+      const agentItems = useMemo(() => {
+        if (agentWindow.ms === Infinity) return filtered
+        const floor = Date.now() - agentWindow.ms
+        return filtered.filter((item) => item.lastActivity >= floor)
+      }, [filtered, agentWindow])
+      const tools = useMemo(() => toolBreakdown(agentItems), [agentItems])
       const statuses = useMemo(() => statusBreakdown(filtered), [filtered])
       // Widen the heatmap just enough to cover the oldest visible session, so
       // the grid is never half empty and never invents history that is not there.
@@ -1481,9 +1619,20 @@ function EmptyState({ board }) {
                     'div',
                     { className: 'fb-card-head' },
                     h('span', { className: 'fb-card-title' }, 'Agent 分布'),
-                    h('span', { className: 'fb-card-meta' }, `${filtered.length} 个会话`),
+                    h(
+                      'span',
+                      { className: 'fb-card-meta' },
+                      agentItems.length === filtered.length
+                        ? `${agentItems.length} 个会话`
+                        : `${agentItems.length} / ${filtered.length} 个会话`,
+                    ),
+                    h(Segmented, { options: AGENT_SCOPES, value: agentScope, onChange: setAgentScope }),
                   ),
-                  h(AgentBars, { rows: tools, total: filtered.length }),
+                  h(AgentBars, {
+                    rows: tools,
+                    total: agentItems.length,
+                    empty: agentScope === 'all' ? '没有数据' : `${agentWindow.label}没有会话，切到别的窗口或点「全部」`,
+                  }),
                 ),
               ),
 
@@ -1522,7 +1671,7 @@ function EmptyState({ board }) {
                         h(
                           'span',
                           { className: 'fb-statusbar-item', key: status.key },
-                          h('i', { className: 'fb-legend-dot', style: { background: status.color } }),
+                          h(StatusGlyph, { status: status.key, size: 12, color: status.color }),
                           `${status.label} ${status.value}`,
                         ),
                       ),
@@ -1561,96 +1710,105 @@ function EmptyState({ board }) {
               h(
                 'div',
                 { className: 'fb-filters' },
-                // Two labelled groups instead of two "全部" chips sitting next
-                // to each other and both looking selected.
-                h('span', { className: 'fb-filter-label' }, 'agent'),
+                // Two rows, one per dimension. The agent row grows with the
+                // machine and the status row never has more than four chips:
+                // sharing a line meant the states drifted right and the
+                // divider between the two groups vanished on the first wrap.
                 h(
-                  'button',
-                  {
-                    type: 'button',
-                    className: `fb-chip${toolFilter === 'all' ? ' fb-chip-active' : ''}`,
-                    title: '显示所有 agent',
-                    onClick: () => setToolFilter('all'),
-                  },
-                  '全部',
-                  h('span', { className: 'fb-chip-count' }, String(agentTotal)),
-                ),
-                // A source that is readable but holds nothing (an empty store)
-                // earns no chip: showing "claude 0" reads like a broken agent.
-                (board.sources || [])
-                  .filter((source) => source.available && (toolCounts.get(source.tool) || 0) > 0)
-                  .map((source) =>
+                  'div',
+                  { className: 'fb-filter-row' },
+                  h('span', { className: 'fb-filter-label' }, 'agent'),
                   h(
                     'button',
                     {
-                      key: source.tool,
                       type: 'button',
-                      className: `fb-chip${toolFilter === source.tool ? ' fb-chip-active' : ''}`,
-                      title: `${toolCounts.get(source.tool) || 0} 个会话 · 再点一次取消筛选`,
-                      // Clicking the selected chip again releases it: a filter
-                      // you cannot take off is a trap.
-                      onClick: () => setToolFilter((current) => toggleFilter(current, source.tool)),
+                      className: `fb-chip${toolFilter === 'all' ? ' fb-chip-active' : ''}`,
+                      title: '显示所有 agent',
+                      onClick: () => setToolFilter('all'),
                     },
-                    h(AgentGlyph, {
-                      tool: source.tool,
-                      size: 12,
-                      color: AGENT_COLOR[source.tool],
-                    }),
-                    source.tool,
-                    h('span', { className: 'fb-chip-count' }, String(toolCounts.get(source.tool) || 0)),
+                    '全部',
+                    h('span', { className: 'fb-chip-count' }, String(agentTotal)),
                   ),
-                ),
-                (() => {
-                  // Agents found on this machine that no parser reads yet: shown
-                  // so the chip row never passes for a complete inventory.
-                  const unparsed = (board.agents || []).filter((agent) => !agent.parsed)
-                  if (unparsed.length === 0) return null
-                  return [
-                    h('span', { key: 'unparsed-sep', className: 'fb-chip-sep' }),
-                    ...unparsed.map((agent) =>
-                      h(
-                        'span',
-                        {
-                          key: `unparsed-${agent.tool}`,
-                          className: 'fb-chip fb-chip-off fb-chip-muted',
-                          title: agent.reason
-                            ? `${agent.path} — ${agent.reason}`
-                            : `检测到 ${agent.path}，但还没有解析器`,
-                        },
-                        h(AgentGlyph, { tool: agent.tool, size: 12 }),
-                        agent.tool,
-                        h('span', { className: 'fb-chip-count' }, agent.reason?.includes('加密') ? '已加密' : '未接入'),
-                      ),
-                    ),
-                  ]
-                })(),
-                h('span', { className: 'fb-chip-sep' }),
-                h('span', { className: 'fb-filter-label' }, '状态'),
-                // Only the states worth filtering on. 刚停 and 无动静 are the
-                // catch-all buckets: they say "nothing happened lately", and
-                // filtering by them just reproduces the 更早 band.
-                FILTERABLE_STATUSES.filter((status) => statusCounts.has(status)).map((status) =>
-                  h(
-                    'button',
-                    {
-                      key: status,
-                      type: 'button',
-                      className: `fb-chip${statusFilter === status ? ' fb-chip-active' : ''}`,
-                      title: `${STATUS[status].hint} · 再点一次取消筛选`,
-                      onClick: () => setStatusFilter((current) => toggleFilter(current, status)),
-                    },
-                    h('i', { className: 'fb-legend-dot', style: { background: STATUS[status].color } }),
-                    STATUS[status].label,
-                    h('span', { className: 'fb-chip-count' }, String(statusCounts.get(status))),
-                  ),
-                ),
-                filtersActive
-                  ? h(
+                  // A source that is readable but holds nothing (an empty store)
+                  // earns no chip: showing "claude 0" reads like a broken agent.
+                  (board.sources || [])
+                    .filter((source) => source.available && (toolCounts.get(source.tool) || 0) > 0)
+                    .map((source) =>
+                    h(
                       'button',
-                      { type: 'button', className: 'fb-chip fb-chip-reset', onClick: resetFilters },
-                      '清空筛选',
-                    )
-                  : null,
+                      {
+                        key: source.tool,
+                        type: 'button',
+                        className: `fb-chip${toolFilter === source.tool ? ' fb-chip-active' : ''}`,
+                        title: `${toolCounts.get(source.tool) || 0} 个会话 · 再点一次取消筛选`,
+                        // Clicking the selected chip again releases it: a filter
+                        // you cannot take off is a trap.
+                        onClick: () => setToolFilter((current) => toggleFilter(current, source.tool)),
+                      },
+                      h(AgentGlyph, {
+                        tool: source.tool,
+                        size: 12,
+                        color: AGENT_COLOR[source.tool],
+                      }),
+                      source.tool,
+                      h('span', { className: 'fb-chip-count' }, String(toolCounts.get(source.tool) || 0)),
+                    ),
+                  ),
+                  (() => {
+                    // Agents found on this machine that no parser reads yet: shown
+                    // so the chip row never passes for a complete inventory.
+                    const unparsed = (board.agents || []).filter((agent) => !agent.parsed)
+                    if (unparsed.length === 0) return null
+                    return [
+                      h('span', { key: 'unparsed-sep', className: 'fb-chip-sep' }),
+                      ...unparsed.map((agent) =>
+                        h(
+                          'span',
+                          {
+                            key: `unparsed-${agent.tool}`,
+                            className: 'fb-chip fb-chip-off fb-chip-muted',
+                            title: agent.reason
+                              ? `${agent.path} — ${agent.reason}`
+                              : `检测到 ${agent.path}，但还没有解析器`,
+                          },
+                          h(AgentGlyph, { tool: agent.tool, size: 12 }),
+                          agent.tool,
+                          h('span', { className: 'fb-chip-count' }, agent.reason?.includes('加密') ? '已加密' : '未接入'),
+                        ),
+                      ),
+                    ]
+                  })(),
+                ),
+                h(
+                  'div',
+                  { className: 'fb-filter-row' },
+                  h('span', { className: 'fb-filter-label' }, '状态'),
+                  // Only the states worth filtering on. 刚停 and 无动静 are the
+                  // catch-all buckets: they say "nothing happened lately", and
+                  // filtering by them just reproduces the 更早 band.
+                  FILTERABLE_STATUSES.filter((status) => statusCounts.has(status)).map((status) =>
+                    h(
+                      'button',
+                      {
+                        key: status,
+                        type: 'button',
+                        className: `fb-chip${statusFilter === status ? ' fb-chip-active' : ''}`,
+                        title: `${STATUS[status].hint} · 再点一次取消筛选`,
+                        onClick: () => setStatusFilter((current) => toggleFilter(current, status)),
+                      },
+                      h(StatusGlyph, { status, size: 12, color: STATUS[status].color }),
+                      STATUS[status].label,
+                      h('span', { className: 'fb-chip-count' }, String(statusCounts.get(status))),
+                    ),
+                  ),
+                  filtersActive
+                    ? h(
+                        'button',
+                        { type: 'button', className: 'fb-chip fb-chip-reset', onClick: resetFilters },
+                        '清空筛选',
+                      )
+                    : null,
+                ),
               ),
 
               board.items.length === 0
@@ -1792,7 +1950,7 @@ function EmptyState({ board }) {
 .fb-kpi-note{margin-top:1px;font-size:10.5px;color:var(--fb-text-4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fb-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:12px;margin-bottom:12px}
 .fb-card{border:1px solid var(--fb-line);border-radius:var(--fb-r-md);background:var(--fb-surface);padding:14px 16px}
-.fb-card-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:12px}
+.fb-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
 .fb-card-title{font-size:13px;font-weight:600}
 .fb-card-meta{font-size:11px;color:var(--fb-text-4)}
 .fb-heat-wrap{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
