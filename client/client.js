@@ -824,6 +824,20 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /**
+     * The panel's sidebar glyph: a control tower broadcasting one arc.
+     *
+     * The host draws its own sidebar icons on a 16px canvas with a 2px stroke,
+     * and its glyphs land at 75–121px of ink over a 14×16 footprint. This one
+     * is drawn to the same brief: the drawing fills the viewBox, the strokes
+     * carry the host's weight, and the ink spreads across the whole width
+     * instead of piling into one blob.
+     *
+     * A second arc was cut on purpose. At 16px two concentric arcs and a
+     * tower cannot keep white space between their strokes, and they merge into
+     * a smudge; one bold arc reads as a broadcast and holds the right edge of
+     * the canvas.
+     */
     function PanelIcon({ size = 18 }) {
       const state = useBoard()
       const attention = state.data ? state.data.attention : 0
@@ -835,31 +849,21 @@ window.__ModuleLoader__.load({
           viewBox: '0 0 24 24',
           fill: 'none',
           stroke: 'currentColor',
-          // The group below is scaled by 1.42, so this lands on ~1.9 once
-          // rendered: as heavy as the icons the host draws beside it.
-          strokeWidth: 1.34,
+          strokeWidth: 2.2,
           strokeLinecap: 'round',
           strokeLinejoin: 'round',
           'aria-hidden': 'true',
         },
-        // Control tower: mast, cabin, tapered leg, and two outbound sweep arcs.
-        //
-        // As authored the drawing filled barely half of the box and sat off to
-        // the right, so the row read as a smaller icon next to the host's.
-        // The transform scales it up and centres it in the viewBox.
-        h(
-          'g',
-          { transform: 'translate(-9.21 -0.91) scale(1.42)' },
-          h('path', { d: 'M12 2.4v2.6' }),
-          h('rect', { x: 9, y: 5, width: 6, height: 2.8, rx: 1 }),
-          h('path', { d: 'M10.2 7.8 9.4 15M13.8 7.8 14.6 15' }),
-          h('path', { d: 'M8.6 15h6.8' }),
-          h('path', { d: 'M16.9 6.2a4.2 4.2 0 0 1 0 6.1' }),
-          h('path', { d: 'M19.1 4.1a7.4 7.4 0 0 1 0 10.3', opacity: 0.55 }),
-          attention > 0
-            ? h('circle', { cx: 19.8, cy: 3.8, r: 2.6, fill: 'var(--dsw-alias-state-warn-primary)', stroke: 'none' })
-            : null,
-        ),
+        // Mast, cabin, tapered body, and the base it stands on.
+        h('path', { d: 'M8.6 1.8V4.4' }),
+        h('rect', { x: 4.9, y: 4.4, width: 7.4, height: 4.8, rx: 1.4 }),
+        h('path', { d: 'M6.3 9.2 4 21M10.9 9.2 13.2 21' }),
+        h('path', { d: 'M2 21H15.2' }),
+        // The broadcast arc, opening away from the cabin.
+        h('path', { d: 'M17.4 5a4.6 4.6 0 0 1 0 9.2' }),
+        attention > 0
+          ? h('circle', { cx: 20.8, cy: 3.2, r: 2, fill: 'var(--dsw-alias-state-warn-primary)', stroke: 'none' })
+          : null,
       )
     }
 
