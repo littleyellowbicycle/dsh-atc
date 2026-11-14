@@ -125,44 +125,41 @@ function loadClient() {
   return definition
 }
 
-test('client registers one tab type and two keyed slot bodies', () => {
+test('client registers a sidebar row and its main panel page', () => {
   const definition = loadClient()
   assert.equal(definition.name, 'dsh-fleet-board')
-  // The tab surface is waited for inside `apply`, so the plugin itself declares
-  // no hard dependency (a host without the right sidebar must still boot).
+  // The surface is waited for inside `apply`, so the plugin declares no hard
+  // dependency (a host without the sidebar must still boot).
   assert.deepEqual([...definition.inject], [])
 
-  const tabs = []
   const slots = []
-  const services = {
-    sidebarRightTabs: { register: (tab) => (tabs.push(tab), () => {}) },
-    slots: { register: (options, component) => (slots.push({ options, component }), () => {}) },
+  const registry = {
+    register: (options, component) => (slots.push({ options, component }), () => {}),
+    inject: (ownerKey, body) => {
+      body()
+      return () => {}
+    },
   }
   const ctx = {
-    effect: (fn) => fn(),
     inject: (names, body) => {
-      assert.deepEqual([...names], ['sidebarRightTabs', 'slots'])
-      body({ ...services, effect: (fn) => fn() })
+      assert.deepEqual([...names], ['slots'])
+      body({ slots: registry })
     },
   }
 
   definition.apply(ctx)
 
-  assert.equal(tabs.length, 1, 'one tab type registered')
-  const tab = tabs[0]
-  assert.equal(tab.id, 'dsh-fleet-board')
-  assert.equal(tab.kind, 'fleet-board')
-  assert.equal(tab.priority, 'extension')
-  assert.equal(typeof tab.title, 'function')
-  assert.equal(tab.title(), '多 Agent 看板')
-  assert.equal(tab.guide.length, 1)
-  assert.equal(typeof tab.guide[0].title(), 'string')
+  assert.equal(slots.length, 2, 'sidebar row + main page registered')
+  const row = slots.find((entry) => entry.options.name === 'sidebar.panellist')
+  const panel = slots.find((entry) => entry.options.name === 'main')
 
-  assert.equal(slots.length, 2, 'body + title registered')
-  const names = slots.map((entry) => entry.options.name).sort()
-  assert.deepEqual(names, ['sidebar.right.pane.tab', 'sidebar.right.pane.tab.title'])
-  for (const entry of slots) {
-    assert.equal(entry.options.key, 'dsh-fleet-board', 'keyed by the tab id')
-    assert.equal(typeof entry.component, 'function', 'component is the second positional argument')
-  }
+  assert.ok(row, 'sidebar.panellist registered')
+  assert.equal(row.options.id, 'fleet-board')
+  assert.equal(typeof row.options.label, 'function')
+  assert.equal(row.options.label(), '看板')
+  assert.equal(typeof row.component, 'function', 'icon is the second positional argument')
+
+  assert.ok(panel, 'main panel registered')
+  assert.equal(panel.options.key, 'fleet-board')
+  assert.equal(typeof panel.component, 'function')
 })

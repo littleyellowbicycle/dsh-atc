@@ -1,7 +1,7 @@
 /**
- * Offline render check: feed the real host payload into the real Board
+ * Offline render check: feed the real host payload into the real page
  * component with real React, print what a user would see, and write an HTML
- * preview. Proves the client half renders rows without DSH running.
+ * preview. Proves the page renders rows without DSH running.
  *
  * `node scripts/render-check.mjs`
  */
@@ -15,6 +15,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { collectBoard } from '../lib/collect.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const ReactForBundle = await import('react')
 
 /** Load the browser bundle the way the DSH module loader would. */
 function loadClient() {
@@ -26,6 +27,8 @@ function loadClient() {
     },
     setInterval: () => 0,
     clearInterval: () => {},
+    setTimeout: () => 0,
+    navigator: { clipboard: { writeText: async () => {} } },
     Date,
     console,
   }
@@ -46,10 +49,6 @@ function loadClient() {
   return definition
 }
 
-// The bundle calls React.createElement at module scope, so the shim must carry
-// the real implementation before the factory runs.
-const ReactForBundle = await import('react')
-
 const definition = loadClient()
 const board = await collectBoard()
 
@@ -57,15 +56,22 @@ const board = await collectBoard()
 definition.__test.store.data = board
 definition.__test.store.at = Date.now()
 
-const html = renderToStaticMarkup(createElement(definition.__test.Board))
-const title = renderToStaticMarkup(createElement(definition.__test.TabTitle))
+const fakeCtx = { get: () => null }
+const html = renderToStaticMarkup(createElement(definition.__test.FleetPage, { ctx: fakeCtx }))
+const strip = (value) =>
+  value
+    .replace(/<style>[\s\S]*?<\/style>/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 
-const strip = (value) => value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+console.log(`text: ${strip(html).slice(0, 420)}…\n`)
 
-console.log(`tab title : ${strip(title)}`)
-console.log(`text      : ${strip(html).slice(0, 400)}…\n`)
-
-const missing = board.items
+// Only the bands that render open by default can be asserted on.
+const visible = board.items.filter((item) =>
+  ['needs-you', 'failed', 'running', 'recent'].includes(item.status),
+)
+const missing = visible
   .slice(0, 8)
   .map((item) => item.title)
   .filter((text) => !html.includes(String(text).slice(0, 12)))
@@ -73,23 +79,22 @@ if (missing.length > 0) {
   console.error(`✗ rows did not render: ${missing.join(' | ')}`)
   process.exit(1)
 }
-if (!html.includes('多 Agent 看板')) {
-  console.error('✗ panel header missing')
-  process.exit(1)
+for (const expected of ['多 Agent 看板', '在跑', '等你', 'DSH 今日']) {
+  if (!html.includes(expected)) {
+    console.error(`✗ missing text: ${expected}`)
+    process.exit(1)
+  }
 }
-if (!html.includes(`${board.items.length}`)) {
-  console.error('✗ session count missing')
-  process.exit(1)
-}
-if (!html.includes(`多 Agent 看板 (${board.attention})`) && board.attention > 0) {
-  console.error('✗ attention badge missing from the tab title')
+if (board.spend && !html.includes(board.spend.symbol)) {
+  console.error('✗ spend symbol missing')
   process.exit(1)
 }
 
 writeFileSync(
   join(root, 'render-check.html'),
   `<!doctype html><meta charset="utf-8"><title>dsh-fleet-board render check</title>
-<body style="margin:0;background:#1b1d21;color:#e6e8eb;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;width:360px">
+<body style="margin:0;background:#fff;color:#1b1d21;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
+<style>:root{--dsw-alias-label-primary:#1b1d21;--dsw-alias-label-secondary:#4a5568;--dsw-alias-label-tertiary:#6b7280;--dsw-alias-label-quaternary:#9aa3b2;--dsw-alias-label-error:#c0392b;--dsw-alias-border-l1:#eceef1;--dsw-alias-border-l2:#dfe3e8;--dsw-alias-separator-primary:#eceef1;--dsw-alias-card-fill:#fafbfc;--dsw-alias-button-elevated-fill:#f4f5f7;--dsw-alias-interactive-bg-hover:#f2f4f7;--dsw-alias-state-success-primary:#2f9e6f;--dsw-alias-state-warn-primary:#d98324;--dsw-alias-state-error-primary:#c0392b;--dsw-alias-state-error-secondary:#f3c2bd;--dsw-alias-state-business-primary:#7048e8;--dsw-alias-brand-primary:#4c6ef5}</style>
 ${html}
 </body>`,
   'utf8',

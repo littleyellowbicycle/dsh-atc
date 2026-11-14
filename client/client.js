@@ -1,9 +1,9 @@
 /**
  * dsh-fleet-board — browser half.
  *
- * Registers one right-Sidebar tab type and its body. The body polls the host's
- * `/dsh-fleet-board/data` route; every pixel of inference already happened on
- * the host, so this half only renders.
+ * Adds a global main panel (a sidebar row like Plugins / Automations) that
+ * lists every local agent session. The host already did all inference; this
+ * half only renders and navigates.
  */
 
 window.__ModuleLoader__.load({
@@ -13,18 +13,14 @@ window.__ModuleLoader__.load({
     const { useCallback, useEffect, useMemo, useState } = React
     const h = React.createElement
 
-    const KIND = 'fleet-board'
-    const TAB_ID = 'dsh-fleet-board'
+    const PANEL_ID = 'fleet-board'
     const ENDPOINT = '/dsh-fleet-board/data'
     const POLL_MS = 5000
+    const ROW_CAP = 60
 
-    /** One module-level store keeps the body and the tab title on the same poll. */
-    const store = {
-      data: null,
-      error: null,
-      at: 0,
-      listeners: new Set(),
-    }
+    /* ---------------------------------------------------------------- store */
+
+    const store = { data: null, error: null, at: 0, listeners: new Set() }
 
     function publish(patch) {
       Object.assign(store, patch)
@@ -61,7 +57,7 @@ window.__ModuleLoader__.load({
     function useBoard() {
       const [, force] = useState(0)
       useEffect(() => {
-        const listener = () => force((n) => n + 1)
+        const listener = () => force((value) => value + 1)
         store.listeners.add(listener)
         const stop = startPolling()
         return () => {
@@ -72,182 +68,153 @@ window.__ModuleLoader__.load({
       return store
     }
 
+    /* ------------------------------------------------------------- vocabulary */
+
     const STATUS = {
-      running: { label: '在跑', color: '#2f9e6f', dot: '●' },
-      'needs-you': { label: '等你', color: '#d98324', dot: '▲' },
-      failed: { label: '失败', color: '#c0392b', dot: '✗' },
-      stopped: { label: '已停', color: '#8a94a6', dot: '■' },
-      done: { label: '完成', color: '#7a8699', dot: '✓' },
-      recent: { label: '刚停', color: '#8a94a6', dot: '·' },
-      idle: { label: '空闲', color: '#9aa3b2', dot: ' ' },
+      running: { label: '在跑', token: 'var(--dsw-alias-state-success-primary)' },
+      'needs-you': { label: '等你', token: 'var(--dsw-alias-state-warn-primary)' },
+      failed: { label: '失败', token: 'var(--dsw-alias-state-error-primary)' },
+      stopped: { label: '已停', token: 'var(--dsw-alias-label-tertiary)' },
+      done: { label: '完成', token: 'var(--dsw-alias-label-tertiary)' },
+      recent: { label: '刚停', token: 'var(--dsw-alias-label-quaternary)' },
+      idle: { label: '空闲', token: 'var(--dsw-alias-label-quaternary)' },
     }
 
-    const TOOL_COLOR = {
-      dsh: '#4c6ef5',
-      codex: '#12b886',
-      opencode: '#f08c00',
-      workbuddy: '#7048e8',
-      trae: '#e8590c',
-      minimax: '#c2255c',
+    const TOOL_TOKEN = {
+      dsh: 'var(--dsw-alias-brand-primary)',
+      codex: 'var(--dsw-alias-state-success-primary)',
+      opencode: 'var(--dsw-alias-state-warn-primary)',
+      workbuddy: 'var(--dsw-alias-state-business-primary)',
     }
 
     function ago(ms) {
       if (!ms) return '—'
       const diff = Date.now() - ms
       if (diff < 0) return '刚刚'
-      if (diff < 60000) return `${Math.max(0, Math.round(diff / 1000))} 秒前`
-      if (diff < 3600000) return `${Math.round(diff / 60000)} 分钟前`
-      if (diff < 86400000) return `${Math.round(diff / 3600000)} 小时前`
-      return `${Math.round(diff / 86400000)} 天前`
+      if (diff < 60_000) return `${Math.max(0, Math.round(diff / 1000))} 秒前`
+      if (diff < 3_600_000) return `${Math.round(diff / 60_000)} 分钟前`
+      if (diff < 86_400_000) return `${Math.round(diff / 3_600_000)} 小时前`
+      return `${Math.round(diff / 86_400_000)} 天前`
     }
 
-    function Chip({ item }) {
-      const status = STATUS[item.status] || STATUS.idle
+    /**
+     * Select a Session in the host UI. `uiWorkspace.openSession` is what the
+     * shipped plugins call; `sessions.open` is kept as a fallback.
+     */
+    function openSession(ctx, sessionId) {
+      if (!sessionId) return false
+      try {
+        const uiWorkspace = ctx.get?.('uiWorkspace') ?? ctx.uiWorkspace
+        if (uiWorkspace && typeof uiWorkspace.openSession === 'function') {
+          uiWorkspace.openSession(sessionId)
+          return true
+        }
+        const sessions = ctx.get?.('sessions') ?? ctx.sessions
+        if (sessions && typeof sessions.open === 'function') {
+          sessions.open(sessionId)
+          return true
+        }
+      } catch {
+        /* navigation is best effort */
+      }
+      return false
+    }
+
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text)
+        return true
+      } catch {
+        return false
+      }
+    }
+
+    /* ------------------------------------------------------------- components */
+
+    function PanelIcon({ size = 18 }) {
+      const state = useBoard()
+      const attention = state.data ? state.data.attention : 0
       return h(
-        'span',
-        { style: { color: status.color, whiteSpace: 'nowrap' } },
-        `${status.dot} ${status.label}`,
+        'svg',
+        {
+          width: size,
+          height: size,
+          viewBox: '0 0 24 24',
+          fill: 'none',
+          stroke: 'currentColor',
+          strokeWidth: 1.7,
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+          'aria-hidden': 'true',
+        },
+        h('rect', { x: 3, y: 4, width: 18, height: 6, rx: 2 }),
+        h('rect', { x: 3, y: 14, width: 11, height: 6, rx: 2 }),
+        h('circle', { cx: 18.5, cy: 17, r: 2.5, fill: 'currentColor', stroke: 'none', opacity: 0.55 }),
+        attention > 0
+          ? h('circle', { cx: 20, cy: 5, r: 3.4, fill: 'var(--dsw-alias-state-warn-primary)', stroke: 'none' })
+          : null,
       )
     }
 
-    function Row({ item }) {
-      const [hover, setHover] = useState(false)
-      const toolColor = TOOL_COLOR[item.tool] || '#6b7280'
+    function Stat({ value, label, token }) {
+      return h(
+        'div',
+        { className: 'fb-stat' },
+        h('span', { className: 'fb-stat-value', style: token ? { color: token } : undefined }, value),
+        h('span', { className: 'fb-stat-label' }, label),
+      )
+    }
+
+    function Row({ item, onOpen }) {
+      const status = STATUS[item.status] || STATUS.idle
+      const clickable = Boolean(item.sessionId)
       return h(
         'div',
         {
-          onMouseEnter: () => setHover(true),
-          onMouseLeave: () => setHover(false),
-          style: {
-            display: 'grid',
-            gridTemplateColumns: '68px 62px 74px 1fr',
-            gap: '6px',
-            alignItems: 'baseline',
-            padding: '6px 8px',
-            borderRadius: '5px',
-            background: hover ? 'rgba(127,127,127,0.10)' : 'transparent',
-            fontSize: '12px',
-            lineHeight: '1.45',
+          className: `fb-row${clickable ? ' fb-row-clickable' : ''}`,
+          role: clickable ? 'button' : undefined,
+          tabIndex: clickable ? 0 : undefined,
+          title: clickable ? '打开这个会话' : `${item.workspace}（不支持跳转）`,
+          onClick: () => onOpen(item),
+          onKeyDown: (event) => {
+            if (clickable && (event.key === 'Enter' || event.key === ' ')) {
+              event.preventDefault()
+              onOpen(item)
+            }
           },
         },
         h(
-          'span',
-          {
-            style: {
-              color: toolColor,
-              fontWeight: 600,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            },
-          },
-          item.tool,
-        ),
-        h(Chip, { item }),
-        h('span', { style: { color: '#8a94a6', whiteSpace: 'nowrap' } }, ago(item.lastActivity)),
-        h(
-          'span',
-          { style: { minWidth: 0 } },
-          h(
-            'span',
-            {
-              style: {
-                display: 'block',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              },
-              title: `${item.workspace} · ${item.title}`,
-            },
-            item.title,
-          ),
-          h(
-            'span',
-            {
-              style: {
-                display: 'block',
-                color: '#9aa3b2',
-                fontSize: '11px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              },
-              title: `${item.workspace}${item.detail ? ` · ${item.detail}` : ''}`,
-            },
-            `${item.workspace}${item.detail ? `  ·  ${item.detail}` : ''}`,
-          ),
-        ),
-      )
-    }
-
-    function Summary({ board }) {
-      const cells = [
-        { label: '在跑', value: board.running, color: STATUS.running.color },
-        { label: '等你', value: board.attention, color: STATUS['needs-you'].color },
-        { label: '会话', value: board.items.length, color: '#6b7280' },
-      ]
-      if (board.spend) {
-        cells.push({
-          label: '今日',
-          value: `${board.spend.symbol}${board.spend.cost.toFixed(2)}`,
-          color: '#6b7280',
-        })
-      }
-      return h(
-        'div',
-        { style: { display: 'flex', gap: '10px', padding: '2px 8px 8px' } },
-        cells.map((cell) =>
+          'div',
+          { className: 'fb-row-main' },
           h(
             'div',
-            {
-              key: cell.label,
-              style: {
-                flex: 1,
-                border: '1px solid rgba(127,127,127,0.18)',
-                borderRadius: '6px',
-                padding: '6px 8px',
-              },
-            },
-            h('div', { style: { fontSize: '17px', fontWeight: 700, color: cell.color } }, String(cell.value)),
-            h('div', { style: { fontSize: '11px', color: '#9aa3b2' } }, cell.label),
+            { className: 'fb-row-title' },
+            h('span', { className: 'fb-tool', style: { color: TOOL_TOKEN[item.tool] || 'inherit' } }, item.tool),
+            h('span', { className: 'fb-title-text' }, item.title),
+          ),
+          h(
+            'div',
+            { className: 'fb-row-meta' },
+            h('span', { className: 'fb-meta-text' }, item.workspace),
+            item.detail ? h('span', { className: 'fb-dot' }, '·') : null,
+            item.detail ? h('span', { className: 'fb-meta-text' }, item.detail) : null,
           ),
         ),
-      )
-    }
-
-    function SourceStrip({ sources }) {
-      return h(
-        'div',
-        {
-          style: {
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '6px',
-            padding: '0 8px 8px',
-            fontSize: '11px',
-            color: '#9aa3b2',
-          },
-        },
-        sources.map((source) =>
+        h(
+          'div',
+          { className: 'fb-row-side' },
           h(
             'span',
-            {
-              key: source.tool,
-              title: source.available ? `${source.count || 0} sessions` : source.reason || 'unavailable',
-              style: {
-                border: '1px solid rgba(127,127,127,0.18)',
-                borderRadius: '10px',
-                padding: '1px 7px',
-                color: source.available ? '#8a94a6' : '#c0392b',
-              },
-            },
-            `${source.tool}${source.available ? '' : ' ✕'}`,
+            { className: 'fb-status', style: { color: status.token } },
+            h('i', { className: 'fb-status-dot', style: { background: status.token } }),
+            status.label,
           ),
+          h('span', { className: 'fb-time' }, ago(item.lastActivity)),
         ),
       )
     }
 
-    function Group({ title, items, defaultOpen, tone, note }) {
+    function Group({ title, items, token, defaultOpen, onOpen, hint }) {
       const [open, setOpen] = useState(defaultOpen)
       if (items.length === 0) return null
       const counts = {}
@@ -255,66 +222,26 @@ window.__ModuleLoader__.load({
       const breakdown = Object.entries(counts)
         .map(([tool, count]) => `${tool} ${count}`)
         .join(' · ')
+      const shown = open ? items.slice(0, ROW_CAP) : []
       return h(
-        'div',
-        { style: { marginBottom: '2px' } },
+        'section',
+        { className: 'fb-group' },
         h(
           'button',
-          {
-            type: 'button',
-            onClick: () => setOpen((value) => !value),
-            style: {
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              width: '100%',
-              border: 'none',
-              background: 'transparent',
-              color: 'inherit',
-              cursor: 'pointer',
-              padding: '6px 8px',
-              fontSize: '11px',
-              fontWeight: 600,
-              textAlign: 'left',
-              opacity: open ? 1 : 0.72,
-            },
-          },
-          h('span', { style: { width: '10px', color: '#9aa3b2' } }, open ? '▾' : '▸'),
-          h('span', { style: { color: tone || 'inherit' } }, title),
-          h('span', { style: { color: '#9aa3b2', fontWeight: 400 } }, `${items.length}`),
-          h(
-            'span',
-            {
-              style: {
-                color: '#b0b7c3',
-                fontWeight: 400,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              },
-            },
-            note || breakdown,
-          ),
+          { type: 'button', className: 'fb-group-head', onClick: () => setOpen((value) => !value) },
+          h('span', { className: 'fb-caret' }, open ? '▾' : '▸'),
+          h('span', { className: 'fb-group-title', style: token ? { color: token } : undefined }, title),
+          h('span', { className: 'fb-count' }, String(items.length)),
+          h('span', { className: 'fb-group-hint' }, hint || breakdown),
         ),
-        open
-          ? [
-              ...items.slice(0, 60).map((item) => h(Row, { key: `${item.tool}:${item.key}`, item })),
-              items.length > 60
-                ? h(
-                    'div',
-                    {
-                      key: 'cap',
-                      style: { padding: '4px 10px', fontSize: '10px', color: '#b0b7c3' },
-                    },
-                    `只显示前 60 条，共 ${items.length} 条`,
-                  )
-                : null,
-            ]
+        shown.map((item) => h(Row, { key: `${item.tool}:${item.key}`, item, onOpen })),
+        open && items.length > ROW_CAP
+          ? h('div', { className: 'fb-cap' }, `只显示前 ${ROW_CAP} 条，共 ${items.length} 条`)
           : null,
       )
     }
 
-    /** Split the flat payload into the four bands a human actually triages. */
+    /** Split the flat payload into the bands a human actually triages. */
     function band(items) {
       const attention = []
       const running = []
@@ -330,167 +257,211 @@ window.__ModuleLoader__.load({
       return { attention, running, recent, older }
     }
 
-    function Board() {
+    function FleetPage(props) {
+      const ctx = props.ctx
       const state = useBoard()
+      const [notice, setNotice] = useState('')
       const board = state.data
 
-      const header = useMemo(
-        () =>
-          h(
-            'div',
-            {
-              style: {
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '10px 8px 6px',
-                fontSize: '12px',
-                fontWeight: 600,
-              },
-            },
-            h('span', null, '多 Agent 看板'),
-            h(
-              'button',
-              {
-                type: 'button',
-                onClick: () => refresh(),
-                style: {
-                  border: '1px solid rgba(127,127,127,0.25)',
-                  background: 'transparent',
-                  borderRadius: '5px',
-                  padding: '2px 8px',
-                  fontSize: '11px',
-                  cursor: 'pointer',
-                  color: 'inherit',
-                },
-              },
-              '刷新',
-            ),
-          ),
-        [],
+      const flash = useCallback((text) => {
+        setNotice(text)
+        setTimeout(() => setNotice(''), 1800)
+      }, [])
+
+      const onOpen = useCallback(
+        async (item) => {
+          if (item.sessionId) {
+            if (openSession(ctx, item.sessionId)) return
+            flash('宿主没有提供会话跳转接口')
+            return
+          }
+          const copied = await copyText(item.workspace)
+          flash(copied ? `已复制工作区路径：${item.workspace}` : `工作区：${item.workspace}`)
+        },
+        [ctx, flash],
       )
 
-      if (state.error && !board) {
-        return h(
-          'div',
-          { style: { padding: '12px', fontSize: '12px', color: '#c0392b' } },
-          `读取失败：${state.error}`,
-        )
-      }
-      if (!board) {
-        return h('div', { style: { padding: '12px', fontSize: '12px', color: '#9aa3b2' } }, '正在扫描本机 agent…')
-      }
+      const bands = useMemo(() => (board ? band(board.items) : null), [board])
 
       return h(
         'div',
-        {
-          style: {
-            height: '100%',
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            boxSizing: 'border-box',
-          },
-        },
-        header,
-        h(Summary, { board }),
-        h(SourceStrip, { sources: board.sources || [] }),
+        { className: 'fb-page' },
+        h('style', null, CSS),
         h(
-          'div',
-          { style: { padding: '0 4px 4px' } },
-          board.items.length === 0
-            ? h('div', { style: { padding: '10px', fontSize: '12px', color: '#9aa3b2' } }, '没有找到活跃会话')
-            : (() => {
-                const bands = band(board.items)
-                return [
-                  bands.attention.length === 0
-                    ? h(
-                        'div',
-                        {
-                          key: 'quiet',
-                          style: { padding: '4px 8px 8px', fontSize: '11px', color: '#2f9e6f' },
-                        },
-                        '✓ 没有需要你处理的',
-                      )
-                    : null,
-                  h(Group, {
-                    key: 'attention',
+          'header',
+          { className: 'fb-head' },
+          h(
+            'div',
+            null,
+            h('h1', { className: 'fb-h1' }, '多 Agent 看板'),
+            h(
+              'p',
+              { className: 'fb-sub' },
+              '本机所有 agent 的会话 · 本地推断 · 零 token',
+              notice ? h('span', { className: 'fb-notice' }, ` · ${notice}`) : null,
+            ),
+          ),
+          h(
+            'button',
+            { type: 'button', className: 'fb-btn', onClick: () => refresh() },
+            '刷新',
+          ),
+        ),
+
+        state.error && !board
+          ? h('div', { className: 'fb-error' }, `读取失败：${state.error}`)
+          : null,
+
+        !board
+          ? h('div', { className: 'fb-empty' }, '正在扫描本机 agent…')
+          : h(
+              'div',
+              { className: 'fb-body' },
+              h(
+                'div',
+                { className: 'fb-stats' },
+                h(Stat, { value: String(board.running), label: '在跑', token: STATUS.running.token }),
+                h(Stat, { value: String(board.attention), label: '等你', token: STATUS['needs-you'].token }),
+                h(Stat, { value: String(board.items.length), label: '显示' }),
+                board.spend
+                  ? h(Stat, {
+                      value: `${board.spend.symbol}${board.spend.cost.toFixed(2)}`,
+                      label: 'DSH 今日',
+                    })
+                  : null,
+              ),
+              h(
+                'div',
+                { className: 'fb-sources' },
+                (board.sources || []).map((source) =>
+                  h(
+                    'span',
+                    {
+                      key: source.tool,
+                      className: `fb-chip${source.available ? '' : ' fb-chip-off'}`,
+                      title: source.available
+                        ? `${source.count || 0} 个会话`
+                        : source.reason || '不可用',
+                    },
+                    source.tool,
+                  ),
+                ),
+                h(
+                  'span',
+                  { className: 'fb-foot' },
+                  board.total && board.total > board.items.length
+                    ? `共 ${board.total} 个会话，只取最近 ${board.items.length} 个`
+                    : `共 ${board.items.length} 个会话`,
+                ),
+              ),
+
+              bands.attention.length === 0
+                ? h('div', { className: 'fb-clear' }, '✓ 没有需要你处理的')
+                : h(Group, {
                     title: '要你处理',
                     items: bands.attention,
+                    token: STATUS['needs-you'].token,
                     defaultOpen: true,
-                    tone: STATUS['needs-you'].color,
+                    onOpen,
                   }),
-                  h(Group, {
-                    key: 'running',
-                    title: '正在跑',
-                    items: bands.running,
-                    defaultOpen: true,
-                    tone: STATUS.running.color,
-                  }),
-                  h(Group, {
-                    key: 'recent',
-                    title: '最近动过',
-                    items: bands.recent,
-                    defaultOpen: true,
-                  }),
-                  h(Group, {
-                    key: 'older',
-                    title: '更早',
-                    items: bands.older,
-                    defaultOpen: false,
-                    note: '点开查看',
-                  }),
-                ]
-              })(),
-        ),
+              h(Group, {
+                title: '正在跑',
+                items: bands.running,
+                token: STATUS.running.token,
+                defaultOpen: true,
+                onOpen,
+              }),
+              h(Group, { title: '最近动过', items: bands.recent, defaultOpen: true, onOpen }),
+              h(Group, {
+                title: '更早',
+                items: bands.older,
+                defaultOpen: false,
+                onOpen,
+                hint: '点开查看',
+              }),
+            ),
+
         h(
-          'div',
-          { style: { padding: '8px', fontSize: '10px', color: '#b0b7c3', textAlign: 'right' } },
-          `显示 ${board.items.length}${board.total && board.total > board.items.length ? ` / 共 ${board.total}` : ''} · 本地推断 · 零 token · ${state.at ? new Date(state.at).toLocaleTimeString() : ''}`,
+          'footer',
+          { className: 'fb-legend' },
+          '点 DSH 行打开会话 · 点其它行复制工作区路径',
         ),
       )
     }
 
-    /** The tab chip carries the attention count, so the number is visible while collapsed. */
-    function TabTitle() {
-      const state = useBoard()
-      const count = state.data ? state.data.attention : 0
-      return h('span', null, count > 0 ? `多 Agent 看板 (${count})` : '多 Agent 看板')
-    }
+    /* ------------------------------------------------------------------ css */
 
-    const tabDefinition = {
-      id: TAB_ID,
-      kind: KIND,
-      priority: 'extension',
-      title: () => '多 Agent 看板',
-      guide: [
-        {
-          id: 'fleet',
-          order: 20,
-          title: () => '多 Agent 看板',
-          description: () => '本机所有 agent 的任务进度（零 token）',
-        },
-      ],
-    }
+    const CSS = `
+.fb-page{box-sizing:border-box;max-width:880px;margin:0 auto;padding:20px 22px 28px;color:var(--dsw-alias-label-primary);font-size:13px;line-height:1.5}
+.fb-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+.fb-h1{margin:0;font-size:16px;font-weight:600;letter-spacing:.01em}
+.fb-sub{margin:3px 0 0;font-size:12px;color:var(--dsw-alias-label-tertiary)}
+.fb-notice{color:var(--dsw-alias-label-secondary)}
+.fb-btn{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-secondary);border-radius:7px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:inherit}
+.fb-btn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.fb-stats{display:flex;gap:22px;padding:12px 14px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-card-fill);margin-bottom:10px}
+.fb-stat{display:flex;flex-direction:column;gap:1px}
+.fb-stat-value{font-size:18px;font-weight:650;font-variant-numeric:tabular-nums}
+.fb-stat-label{font-size:11px;color:var(--dsw-alias-label-tertiary)}
+.fb-sources{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 6px}
+.fb-chip{font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-tertiary)}
+.fb-chip-off{color:var(--dsw-alias-label-error);border-color:var(--dsw-alias-state-error-secondary)}
+.fb-foot{margin-left:auto;font-size:11px;color:var(--dsw-alias-label-quaternary)}
+.fb-clear{padding:6px 2px 10px;font-size:12px;color:var(--dsw-alias-state-success-primary)}
+.fb-group{margin-bottom:2px}
+.fb-group-head{display:flex;align-items:center;gap:6px;width:100%;border:none;background:transparent;color:inherit;font-family:inherit;font-size:11.5px;font-weight:600;padding:8px 4px 5px;cursor:pointer;text-align:left}
+.fb-caret{width:10px;color:var(--dsw-alias-label-quaternary);font-size:9px}
+.fb-count{color:var(--dsw-alias-label-tertiary);font-weight:500}
+.fb-group-hint{margin-left:auto;font-size:10.5px;font-weight:400;color:var(--dsw-alias-label-quaternary)}
+.fb-row{display:flex;align-items:center;gap:12px;padding:7px 10px;border-radius:8px;border:1px solid transparent}
+.fb-row-clickable{cursor:pointer}
+.fb-row-clickable:hover{background:var(--dsw-alias-interactive-bg-hover);border-color:var(--dsw-alias-border-l1)}
+.fb-row-main{min-width:0;flex:1}
+.fb-row-title{display:flex;align-items:baseline;gap:8px;min-width:0}
+.fb-tool{font-size:10.5px;font-weight:600;flex:none;text-transform:lowercase}
+.fb-title-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-primary)}
+.fb-row-meta{display:flex;align-items:baseline;gap:5px;min-width:0;margin-top:1px}
+.fb-meta-text{font-size:11px;color:var(--dsw-alias-label-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fb-dot{color:var(--dsw-alias-label-quaternary)}
+.fb-row-side{display:flex;align-items:center;gap:10px;flex:none}
+.fb-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;white-space:nowrap}
+.fb-status-dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.fb-time{font-size:11px;color:var(--dsw-alias-label-quaternary);font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
+.fb-cap{padding:4px 12px;font-size:10.5px;color:var(--dsw-alias-label-quaternary)}
+.fb-empty,.fb-error{padding:14px 2px;font-size:12px;color:var(--dsw-alias-label-tertiary)}
+.fb-error{color:var(--dsw-alias-label-error)}
+.fb-legend{margin-top:16px;padding-top:10px;border-top:1px solid var(--dsw-alias-separator-primary);font-size:10.5px;color:var(--dsw-alias-label-quaternary)}
+`
+
+    /* ---------------------------------------------------------------- wiring */
 
     const inject = []
 
     function apply(ctx) {
-      // Mirror the proven pattern: wait for the right-sidebar service inside a
-      // scoped inject and bail out quietly when it is absent, instead of
-      // declaring it in the plugin's own dependency list (which would keep
-      // `apply` from running at all on a host without that package).
-      ctx.inject(['sidebarRightTabs', 'slots'], (inner) => {
-        const tabs = inner.sidebarRightTabs
-        if (!tabs || typeof tabs.register !== 'function') return
-        inner.effect(() => tabs.register(tabDefinition), 'dsh-fleet-board: tab type')
-        inner.slots.register({ name: 'sidebar.right.pane.tab', key: TAB_ID, registrant: TAB_ID }, Board)
-        inner.slots.register(
-          { name: 'sidebar.right.pane.tab.title', key: TAB_ID, registrant: TAB_ID },
-          TabTitle,
+      // Wait for the slot registry inside a scoped inject: a host without it
+      // must not keep `apply` from running, and a missing service must not throw.
+      ctx.inject(['slots'], (inner) => {
+        const slots = inner.slots
+        if (!slots || typeof slots.register !== 'function') return
+        const page = (props) => h(FleetPage, { ...props, ctx: inner })
+
+        // The sidebar row (beside Plugins / Automations) …
+        slots.inject('sidebar.panellist', () =>
+          slots.register(
+            {
+              name: 'sidebar.panellist',
+              id: PANEL_ID,
+              order: 30,
+              label: () => '看板',
+            },
+            PanelIcon,
+          ),
         )
-        // Evidence hook for the headless live check: only set once both
-        // registrations returned without throwing.
+        // … and the main-column page it addresses.
+        slots.inject('main', () =>
+          slots.register({ name: 'main', key: PANEL_ID, registrant: PANEL_ID }, page),
+        )
+
         globalThis.__dshFleetBoard = { registered: true, at: Date.now() }
       })
     }
@@ -500,7 +471,7 @@ window.__ModuleLoader__.load({
       inject,
       apply,
       /** Seams for the offline render check; the host never reads these. */
-      __test: { Board, TabTitle, store, refresh },
+      __test: { FleetPage, store, refresh },
     }
   },
 })

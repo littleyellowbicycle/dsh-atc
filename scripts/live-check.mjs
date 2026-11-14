@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Headless live check: open a running DSH web instance in Edge (headless, CDP),
  * confirm the client half actually registered inside the real host, and save a
  * screenshot as evidence.
@@ -117,7 +117,14 @@ try {
       expression: `(() => {
         const wanted = ${JSON.stringify(label)}
         const nodes = Array.from(document.querySelectorAll('button,[role="button"],[role="tab"],[role="menuitem"]'))
-        const hit = nodes.find((el) => (el.getAttribute('aria-label') || el.getAttribute('title') || el.innerText || '').trim().includes(wanted))
+        const hit = nodes.find((el) => {
+          const hay = [
+            el.getAttribute('aria-label') || '',
+            el.getAttribute('title') || '',
+            el.innerText || '',
+          ].join(' ')
+          return hay.includes(wanted)
+        })
         if (!hit) return false
         hit.click()
         return true

@@ -1,6 +1,6 @@
 # dsh-fleet-board
 
-DeepSeek Harness 的多 Agent 看板：在右栏加一个 tab，一屏看完**本机所有 agent** 正在干什么。
+DeepSeek Harness 的多 Agent 看板：在**左侧栏**加一行（和「插件」「自动化任务」并列），点开就是全屏面板，一屏看完**本机所有 agent** 正在干什么。
 
 零 token —— 宿主侧只读本地会话存储、纯本地推断状态，不经过任何模型。
 
@@ -30,7 +30,22 @@ Trae / MiniMax 暂无稳定结构化字段，待补。任何一个源失败只�
 ▸ 更早 118    点开查看       ← 默认折叠，展开最多 60 条
 ```
 
-判据：`needs-you`/`failed` → 第一段；`running` → 第二段；其余按 `recentMinutes` 切「最近动过 / 更早」。组标题上的数字是条数，右边是各工具分布。底栏写明「显示 124 / 共 521」，因为每个源最多取 `perSource` 条。
+判据：`needs-you`/`failed` → 第一段；`running` → 第二段；其余按 `recentMinutes` 切「最近动过 / 更早」。组标题上的数字是条数，右边是各工具分布。顶部的「共 530 个会话，只取最近 124 个」说明每个源最多取 `perSource` 条。
+
+## 跳转
+
+- **DSH 行**：点一下直接切到那个会话（`uiWorkspace.openSession`）
+- **其它行**：复制该行的工作区路径，方便去对应工具里找
+- 行尾的状态点与相对时间来自宿主推断，不代表工具本身在跑
+
+## 今日花费
+
+顶部「DSH 今日 ¥1.87」读的是 `~/.dsh/storages/cost-meter/ledger.json`（`dsh-cost-meter` 插件的账本）：
+
+- 按**本地日期**分天，一天一条记录
+- 币种跟随账本 `config.currency`：CNY 取 `costCny`、USD 取 `cost`、EUR 取 `costEur`（**不是**把美元数字套人民币符号）
+- 它是 **DSH 自己**的消费，不含 codex / opencode / WorkBuddy
+- 换 provider 会跟着变：账本按 `provider:model` 分桶（如 `volcengine:deepseek-v4.1-flash`），日总额是当天所有 provider 之和
 
 ## 可调参数
 
@@ -81,7 +96,7 @@ Trae / MiniMax 暂无稳定结构化字段，待补。任何一个源失败只�
 | codex | `volcengine` | rollout 头部的 `model_provider` |
 | dsh / opencode | 无 | 其存储不提供 per-session 成本 |
 
-顶栏「今日 ¥1.18」来自 DSH `storages/cost-meter/ledger.json`（该账本按**天**记，不按会话，所以只进汇总条）。
+顶栏「DSH 今日 ¥1.87」来自 DSH `storages/cost-meter/ledger.json`（该账本按**天**记，也按 `provider:model` 分桶，不按会话，所以只进汇总）。
 
 ## 安装（desktop profile）
 
@@ -104,7 +119,7 @@ cd "$env:USERPROFILE\.dsh\profiles\desktop"
 
 ## 使用
 
-右栏「+」→ 选「多 Agent 看板」。tab 上括号里的数字 = 等你决策 + 失败的条数。
+左侧栏（和「插件」「自动化任务」并列）会多一行「**看板**」，点开就是面板。图标右上角出现小圆点表示有需要你处理的事。
 
 ## 本地开发
 
@@ -127,7 +142,7 @@ dsh plugin --profile fleet-test add "link:/path/to/dsh-fleet-board"
 # 2. 起一个独立 web 实例
 dsh --profile fleet-test --port 60200 --no-open
 
-# 3. 无头 Edge 打开、点开右栏、点我们的入口、截图
+# 3. 无头 Edge 打开、点开左侧栏的「看板」、截图
 node scripts/live-check.mjs 'http://127.0.0.1:60200/?token=<token>' `
   '--click=打开右侧边栏' '--click=多 Agent 看板'
 ```
