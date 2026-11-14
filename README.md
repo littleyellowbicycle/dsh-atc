@@ -14,6 +14,10 @@ dsh plugin add dsh-atc
 
 装完重启 DSH（宿主侧插件只在启动时组合），左侧栏出现「空管」。
 
+![界面](docs/preview-board.png)
+
+*截图是用**合成数据**渲染的真实组件——布局、图标、分档都是真的，会话标题/工作区/计数全是编的，不来自任何一台机器。*
+
 ## 它解决什么
 
 同时用 DSH / codex / opencode / WorkBuddy / Trae / MiniMax 时，注意力会被切成 N 份。这个插件把「谁在跑、谁停了、谁在等我」压到一屏。

@@ -79,10 +79,29 @@ function sha(file, algorithm, encoding) {
   return createHash(algorithm).update(readFileSync(file)).digest(encoding)
 }
 
+/** Copy the synthetic preview next to the tarball, when it exists. */
+function copyPreview(dir) {
+  const source = join(dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'preview-board.png')
+  if (!existsSync(source)) {
+    say('  no docs/preview-board.png — mirroring without a screenshot')
+    return false
+  }
+  if (dryRun) {
+    say('  would copy docs/preview-board.png')
+    return true
+  }
+  writeFileSync(join(dir, 'preview-board.png'), readFileSync(source))
+  return true
+}
+
 function writeMirrorReadme({ dir, file, version, sha256, sha1, sizeKb, tarballUrl, releaseUrl }) {
   const body = `# ${name} ${version}（离线包）
 
 Agent 空管中心（\`${name}\`）是一个 DeepSeek Harness 插件：在**左侧栏**加一行「空管」，点开是一屏面板，列出本机所有 agent 的会话（DSH / codex / opencode / WorkBuddy / Gemini / ZCode / MiniMax），按注意力排序。零 token、不联网、只读本地存储。
+
+![界面](preview-board.png)
+
+*截图是用**合成数据**渲染的真实组件：布局、图标、分档都是真的，会话标题/工作区/计数全是编的，不来自任何一台机器。*
 
 这个目录是为了让**没有 npm 凭据或访问不到 registry 的隔离网络**也能装上它。
 
@@ -239,6 +258,8 @@ async function main() {
     tarballUrl,
     releaseUrl: `${String(manifest.repository?.url ?? '').replace(/^git\+/, '').replace(/\.git$/, '')}/releases/tag/v${version}`,
   })
+
+  copyPreview(dir)
 
   const description = manifest.description ?? ''
   updateIndexRow({
