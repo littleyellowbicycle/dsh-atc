@@ -46,7 +46,8 @@ const RULES = [
   {
     id: 'machine-artifact',
     why: '本机文件头 / 表名 / 体量细节',
-    test: (line) => /SQLite format 3|ItemTable|\bd2 ac 8b\b|\b1[0-9]{2}\s?MB\b/i.test(line),
+    // The SQLite magic is a spec string; a hex dump or a size is the giveaway.
+    test: (line) => /ItemTable|\bd2 ac 8b\b|\b1[0-9]{2}\s?MB\b/i.test(line),
   },
   {
     id: 'secret',
