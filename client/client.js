@@ -76,6 +76,38 @@ window.__ModuleLoader__.load({
       return store
     }
 
+    /* ------------------------------------------------------------- hidden */
+
+    /**
+     * Rows the user removed from the board. This is a display-only list: the
+     * stores themselves are never touched, so a hidden session keeps running
+     * and can be brought back at any time.
+     */
+    const HIDDEN_KEY = 'dsh-atc:hidden'
+
+    /** Stable identity of one row across polls. */
+    function itemKey(item) {
+      return `${item.tool}:${item.key ?? item.sessionId ?? item.workspace}`
+    }
+
+    function loadHidden() {
+      try {
+        const raw = globalThis.localStorage?.getItem(HIDDEN_KEY)
+        const list = raw ? JSON.parse(raw) : []
+        return new Set(Array.isArray(list) ? list : [])
+      } catch {
+        return new Set()
+      }
+    }
+
+    function saveHidden(set) {
+      try {
+        globalThis.localStorage?.setItem(HIDDEN_KEY, JSON.stringify([...set]))
+      } catch {
+        /* a blocked storage must not break hiding within this session */
+      }
+    }
+
     /* ------------------------------------------------------------- vocabulary */
 
     /**
@@ -751,10 +783,69 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * Right-click menu for a session card.
+     *
+     * Clamped to the viewport so a card near an edge cannot open a menu half
+     * off-screen; Escape or any outside click closes it, like a native menu.
+     */
+    function ContextMenu({ at, items, onClose }) {
+      useEffect(() => {
+        const close = () => onClose()
+        const onKey = (event) => {
+          if (event.key === 'Escape') onClose()
+        }
+        window.addEventListener('click', close)
+        window.addEventListener('resize', close)
+        window.addEventListener('keydown', onKey)
+        return () => {
+          window.removeEventListener('click', close)
+          window.removeEventListener('resize', close)
+          window.removeEventListener('keydown', onKey)
+        }
+      }, [onClose])
+
+      const width = 208
+      const height = 14 + items.length * 30
+      const left = Math.min(at.x, Math.max(8, window.innerWidth - width - 8))
+      const top = Math.min(at.y, Math.max(8, window.innerHeight - height - 8))
+
+      return h(
+        'div',
+        {
+          className: 'fb-menu',
+          style: { left: `${left}px`, top: `${top}px`, width: `${width}px` },
+          role: 'menu',
+          onClick: (event) => event.stopPropagation(),
+          onContextMenu: (event) => event.preventDefault(),
+        },
+        items.map((item, index) =>
+          item.separator
+            ? h('div', { className: 'fb-menu-sep', key: `sep-${index}` })
+            : h(
+                'button',
+                {
+                  type: 'button',
+                  key: item.label,
+                  className: `fb-menu-item${item.danger ? ' fb-menu-danger' : ''}`,
+                  role: 'menuitem',
+                  onClick: () => {
+                    onClose()
+                    item.onSelect()
+                  },
+                },
+                h('span', { className: 'fb-menu-icon' }, item.icon ?? ''),
+                item.label,
+                item.hint ? h('span', { className: 'fb-menu-hint' }, item.hint) : null,
+              ),
+        ),
+      )
+    }
+
+    /**
      * Session card: title + relative time on top, agent / workspace tags in
      * the middle, status and context pressure on the footer.
      */
-    function SessionCard({ item, onOpen }) {
+    function SessionCard({ item, onOpen, onMenu }) {
       const status = STATUS[item.status] || STATUS.idle
       const color = AGENT_COLOR[item.tool] || PALETTE.slate
       const clickable = Boolean(item.sessionId)
@@ -768,8 +859,12 @@ window.__ModuleLoader__.load({
           className: `fb-session${clickable ? ' fb-session-clickable' : ''}`,
           role: clickable ? 'button' : undefined,
           tabIndex: clickable ? 0 : undefined,
-          title: clickable ? '打开这个会话' : `${item.workspace}（不支持跳转）`,
+          title: clickable ? '打开这个会话 · 右键更多操作' : `${item.workspace}（不支持跳转）· 右键更多操作`,
           onClick: () => onOpen(item),
+          onContextMenu: (event) => {
+            event.preventDefault()
+            onMenu && onMenu(item, event)
+          },
           onKeyDown: (event) => {
             if (clickable && (event.key === 'Enter' || event.key === ' ')) {
               event.preventDefault()
@@ -829,7 +924,7 @@ window.__ModuleLoader__.load({
     }
 
     /** Collapsible band of sessions. */
-    function Group({ title, items, color, defaultOpen, onOpen, hint }) {
+    function Group({ title, items, color, defaultOpen, onOpen, onMenu, hint }) {
       const [open, setOpen] = useState(defaultOpen)
       if (items.length === 0) return null
       const counts = {}
@@ -867,7 +962,7 @@ window.__ModuleLoader__.load({
           ? h(
               'div',
               { className: 'fb-session-grid' },
-              shown.map((item) => h(SessionCard, { key: `${item.tool}:${item.key}`, item, onOpen })),
+              shown.map((item) => h(SessionCard, { key: `${item.tool}:${item.key}`, item, onOpen, onMenu })),
             )
           : null,
       )
@@ -941,6 +1036,9 @@ function EmptyState({ board }) {
       const [toolFilter, setToolFilter] = useState('all')
       const [sort, setSort] = useState('time')
       const [paused, setPaused] = useState(false)
+      // Rows removed from the board. Display-only: nothing on disk is touched.
+      const [hidden, setHidden] = useState(() => loadHidden())
+      const [menu, setMenu] = useState(null)
       const board = state.data
 
       // The poller reads this flag; keeping it in the store means pausing does
@@ -967,14 +1065,70 @@ function EmptyState({ board }) {
         [ctx, flash],
       )
 
+      const hideItem = useCallback(
+        (item) => {
+          const next = new Set(hidden)
+          next.add(itemKey(item))
+          setHidden(next)
+          saveHidden(next)
+          flash('已从这个看板移除，可在页脚恢复')
+        },
+        [hidden, flash],
+      )
+
+      const restoreHidden = useCallback(() => {
+        setHidden(new Set())
+        saveHidden(new Set())
+        flash('已恢复所有移除的会话')
+      }, [flash])
+
+      const openMenu = useCallback((item, event) => {
+        setMenu({ item, x: event.clientX, y: event.clientY })
+      }, [])
+
+      const menuItems = useMemo(() => {
+        if (!menu) return []
+        const item = menu.item
+        return [
+          {
+            label: '从看板移除',
+            icon: '⌫',
+            danger: true,
+            hint: '不影响数据',
+            onSelect: () => hideItem(item),
+          },
+          { separator: true },
+          {
+            label: item.sessionId ? '打开会话' : '复制工作区路径',
+            icon: '↗',
+            onSelect: () => onOpen(item),
+          },
+          {
+            label: '复制标题',
+            icon: '⧉',
+            onSelect: async () => {
+              const copied = await copyText(item.title)
+              flash(copied ? '已复制标题' : item.title)
+            },
+          },
+          ...(hidden.size > 0
+            ? [
+                { separator: true },
+                {
+                  label: `恢复已移除的 ${hidden.size} 条`,
+                  icon: '↺',
+                  onSelect: restoreHidden,
+                },
+              ]
+            : []),
+        ]
+      }, [menu, hidden, hideItem, restoreHidden, onOpen, flash])
+
       const filters = { query, range, status: statusFilter, tool: toolFilter }
-      const filtered = useMemo(() => (board ? filterItems(board.items, filters) : []), [
-        board,
-        query,
-        range,
-        statusFilter,
-        toolFilter,
-      ])
+      const filtered = useMemo(() => {
+        if (!board) return []
+        return filterItems(board.items, filters).filter((item) => !hidden.has(itemKey(item)))
+      }, [board, query, range, statusFilter, toolFilter, hidden])
       const bands = useMemo(() => band(filtered), [filtered])
       const sortedBands = useMemo(
         () => ({
@@ -1014,12 +1168,6 @@ function EmptyState({ board }) {
       // "Connected" means it yielded rows: an empty store is not a failure, and
       // counting unreadable agents in the denominator would misread as broken.
       const activeTools = board ? new Set(board.items.map((item) => item.tool)).size : 0
-      const unreadable = board ? (board.agents || []).filter((agent) => !agent.parsed).length : 0
-      // An agent whose store exists but cannot be read is a fault, not a
-      // statistic: name it where work is waiting.
-      const unreadableNames = board
-        ? (board.agents || []).filter((agent) => !agent.parsed).map((agent) => agent.tool)
-        : []
       const totalTools = board ? (board.sources || []).length : 0
       const lastSeen = board && board.items.length ? board.items[0].lastActivity : 0
 
@@ -1109,6 +1257,8 @@ function EmptyState({ board }) {
           ),
         ),
 
+        menu ? h(ContextMenu, { at: { x: menu.x, y: menu.y }, items: menuItems, onClose: () => setMenu(null) }) : null,
+
         state.error && !board
           ? h('div', { className: 'fb-error' }, `读取失败：${state.error}`)
           : null,
@@ -1128,8 +1278,7 @@ function EmptyState({ board }) {
               h(
                 'div',
                 { className: 'fb-kpi-note' },
-                `完成 ${doneCount} · 本机 ${board.total || board.items.length} · 接入 ${activeTools}/${totalTools}` +
-                  (unreadable > 0 ? ` · ${unreadable} 个读不了` : ''),
+                `完成 ${doneCount} · 本机 ${board.total || board.items.length} · 接入 ${activeTools}/${totalTools}`,
               ),            h(
                 'div',
                 { className: 'fb-charts' },
@@ -1423,24 +1572,12 @@ function EmptyState({ board }) {
                   )
                 : null,
 
-              unreadable > 0
-                ? h(
-                    'div',
-                    { className: 'fb-alert' },
-                    h('span', { className: 'fb-alert-mark' }, '!'),
-                    h(
-                      'span',
-                      null,
-                      `${unreadableNames.join('、')} 的会话存在但读不了——状态未知，不是没有任务。`,
-                    ),
-                  )
-                : null,
-
               h(Group, {
                 title: '要你处理',
                 items: sortedBands.attention,
                 color: STATUS['needs-you'].color,
                 defaultOpen: true,
+                onMenu: openMenu,
                 onOpen,
               }),
               h(Group, {
@@ -1448,6 +1585,7 @@ function EmptyState({ board }) {
                 items: sortedBands.running,
                 color: STATUS.running.color,
                 defaultOpen: true,
+                onMenu: openMenu,
                 onOpen,
               }),
               h(Group, {
@@ -1455,6 +1593,7 @@ function EmptyState({ board }) {
                 items: sortedBands.recent,
                 color: STATUS.recent.color,
                 defaultOpen: true,
+                onMenu: openMenu,
                 onOpen,
               }),
               h(Group, {
@@ -1462,6 +1601,7 @@ function EmptyState({ board }) {
                 items: sortedBands.older,
                 color: STATUS.idle.color,
                 defaultOpen: false,
+                onMenu: openMenu,
                 onOpen,
                 hint: '点开查看',
               }),
@@ -1471,7 +1611,18 @@ function EmptyState({ board }) {
           'footer',
           { className: 'fb-foot' },
           h('span', null, '点 DSH 行打开会话 · 点其它行复制工作区路径'),
-          h('span', null, `最后活动 ${ago(lastSeen)}`),
+          h(
+            'span',
+            { className: 'fb-hidden-note' },
+            hidden.size > 0
+              ? h(
+                  'span',
+                  null,
+                  `已移除 ${hidden.size} 条`,
+                  h('button', { type: 'button', className: 'fb-hidden-restore', onClick: restoreHidden }, '恢复'),
+                )
+              : h('span', null, `最后活动 ${ago(lastSeen)}`),
+          ),
         ),
 
         notice ? h('div', { className: 'fb-toast' }, notice) : null,
@@ -1593,6 +1744,18 @@ function EmptyState({ board }) {
 .fb-meter i{display:block;height:100%;border-radius:999px;background:#d98324}
 .fb-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 9px;border-radius:999px;white-space:nowrap}
 .fb-status-dot{width:5px;height:5px;border-radius:50%;display:inline-block}
+/* Right-click menu: floats above the board, clamped to the viewport. */
+.fb-menu{position:fixed;z-index:60;padding:6px;background:var(--fb-surface);border:1px solid var(--fb-line);border-radius:var(--fb-r-sm);box-shadow:0 12px 32px rgba(15,23,42,.18);display:flex;flex-direction:column;gap:1px}
+.fb-menu-item{display:flex;align-items:center;gap:8px;width:100%;padding:7px 9px;border:0;border-radius:var(--fb-r-xs);background:none;color:var(--fb-text);font-size:12px;text-align:left;cursor:pointer;font-family:inherit}
+.fb-menu-item:hover{background:var(--fb-fill)}
+.fb-menu-danger{color:#c0392b}
+.fb-menu-danger:hover{background:rgba(217,83,79,.1)}
+.fb-menu-icon{width:14px;display:inline-flex;justify-content:center;color:var(--fb-text-3);font-size:11px}
+.fb-menu-hint{margin-left:auto;color:var(--fb-text-4);font-size:10px}
+.fb-menu-sep{height:1px;margin:4px 6px;background:var(--fb-line-soft)}
+.fb-hidden-note{gap:8px}
+.fb-hidden-restore{border:0;background:none;color:var(--fb-text-3);font-size:11px;text-decoration:underline;cursor:pointer;padding:0 0 0 8px;font-family:inherit}
+.fb-hidden-restore:hover{color:var(--fb-text)}
 /* One line of inventory under the action KPIs, instead of four more cards. */
 .fb-kpi-note{margin:-2px 0 14px;font-size:11px;color:var(--fb-text-4)}
 /* A fault worth acting on, placed above the work queue. */
