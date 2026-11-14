@@ -473,15 +473,26 @@ window.__ModuleLoader__.load({
       ],
     }
 
-    const inject = ['slots', 'sidebarRightTabs']
+    const inject = []
 
     function apply(ctx) {
-      ctx.effect(() => ctx.sidebarRightTabs.register(tabDefinition), 'dsh-fleet-board: tab type')
-      ctx.slots.register({ name: 'sidebar.right.pane.tab', key: TAB_ID, registrant: TAB_ID }, Board)
-      ctx.slots.register({ name: 'sidebar.right.pane.tab.title', key: TAB_ID, registrant: TAB_ID }, TabTitle)
-      // Evidence hook for the headless live check: only set once both
-      // registrations returned without throwing.
-      globalThis.__dshFleetBoard = { registered: true, at: Date.now() }
+      // Mirror the proven pattern: wait for the right-sidebar service inside a
+      // scoped inject and bail out quietly when it is absent, instead of
+      // declaring it in the plugin's own dependency list (which would keep
+      // `apply` from running at all on a host without that package).
+      ctx.inject(['sidebarRightTabs', 'slots'], (inner) => {
+        const tabs = inner.sidebarRightTabs
+        if (!tabs || typeof tabs.register !== 'function') return
+        inner.effect(() => tabs.register(tabDefinition), 'dsh-fleet-board: tab type')
+        inner.slots.register({ name: 'sidebar.right.pane.tab', key: TAB_ID, registrant: TAB_ID }, Board)
+        inner.slots.register(
+          { name: 'sidebar.right.pane.tab.title', key: TAB_ID, registrant: TAB_ID },
+          TabTitle,
+        )
+        // Evidence hook for the headless live check: only set once both
+        // registrations returned without throwing.
+        globalThis.__dshFleetBoard = { registered: true, at: Date.now() }
+      })
     }
 
     return {

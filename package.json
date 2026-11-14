@@ -1,6 +1,6 @@
 {
   "name": "dsh-fleet-board",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Multi-agent fleet board for DeepSeek Harness: one right-sidebar tab showing what every local agent (DSH, codex, opencode, WorkBuddy) is doing — zero token, host-side inference.",
   "type": "module",
   "main": "./lib/index.js",
@@ -33,6 +33,7 @@
     },
     "client": {
       "platform": "web",
+      "immediately": true,
       "inject": [
         "@deepseek-ai/dsh-client-ui-sidebar-right",
         "@deepseek-ai/dsh-client-ui-slots"

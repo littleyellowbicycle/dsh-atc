@@ -128,16 +128,22 @@ function loadClient() {
 test('client registers one tab type and two keyed slot bodies', () => {
   const definition = loadClient()
   assert.equal(definition.name, 'dsh-fleet-board')
-  // The definition was built inside a vm realm, so its arrays have a foreign
-  // prototype: copy before comparing.
-  assert.deepEqual([...definition.inject], ['slots', 'sidebarRightTabs'])
+  // The tab surface is waited for inside `apply`, so the plugin itself declares
+  // no hard dependency (a host without the right sidebar must still boot).
+  assert.deepEqual([...definition.inject], [])
 
   const tabs = []
   const slots = []
-  const ctx = {
-    effect: (fn) => fn(),
+  const services = {
     sidebarRightTabs: { register: (tab) => (tabs.push(tab), () => {}) },
     slots: { register: (options, component) => (slots.push({ options, component }), () => {}) },
+  }
+  const ctx = {
+    effect: (fn) => fn(),
+    inject: (names, body) => {
+      assert.deepEqual([...names], ['sidebarRightTabs', 'slots'])
+      body({ ...services, effect: (fn) => fn() })
+    },
   }
 
   definition.apply(ctx)
