@@ -67,7 +67,8 @@
     "brand-icons": "node scripts/build-brand-icons.mjs",
     "brand-icons:check": "node scripts/build-brand-icons.mjs --check",
     "scan-agents": "node scripts/scan-agents.mjs",
-    "empty-check": "node scripts/empty-check.mjs"
+    "empty-check": "node scripts/empty-check.mjs",
+    "sync-mirror": "node scripts/sync-mirror.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1"

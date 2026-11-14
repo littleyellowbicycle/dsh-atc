@@ -66,6 +66,29 @@ npm.cmd publish --registry=https://registry.npmjs.org/
 - Windows 上 PowerShell 执行策略禁止跑 `npm.ps1`，命令要写 `npm.cmd`。
 - `prepublishOnly` 会跑 `check` + `test` + 脱敏自查，任一失败就自己拒绝发布。
 
+### 2.5 镜像到 gitcode 同步仓（隔离网络用）
+
+隔离网络里的机器连不上 npm registry，所以发布后把 tarball 原样镜像到
+[blueyellow-sync](https://gitcode.com/littleyellowbicycle/blueyellow-sync) 的 `packages/` 下：
+
+```powershell
+npm.cmd run sync-mirror                    # 镜像 + 提交 + 推送
+npm.cmd run sync-mirror -- --dry-run       # 只说要做什么
+npm.cmd run sync-mirror -- --no-push       # 提交但不推
+```
+
+脚本做三件事：
+
+1. 从 registry 取 `dist.tarball`（**不能**用 `npm pack` 重打——字节变了校验值就不对）
+2. 用 registry 自己的 `sha512` / `sha1` 校验，不一致直接拒绝镜像
+3. 生成 `packages/dsh-atc-<版本>/README.md`（含 SHA-256、来源、三种安装方式），并在同步仓根 README 的目录表里加/更新该行
+
+几条护栏：
+
+- 同步仓有未提交改动、或落后远端时**拒绝动手**，避免把两侧搞分叉
+- 幂等：tgz 已存在就只重新校验；README 与索引行原地更新，不会重复加行
+- 默认路径是 `D:/project/mem_pool/blueyellow-sync`，可用 `--repo` 或 `$DSH_ATC_SYNC_REPO` 覆盖
+
 ### 3. 给 awesome-dsh-plugin 提 PR
 
 只加**一个文件** `data/plugins/littleyellowbicycle__dsh-atc.yml`：
