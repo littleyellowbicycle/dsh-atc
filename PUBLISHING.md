@@ -20,14 +20,14 @@ dshmarket 的 README 写得很直白：*「市场里的插件列表来自精选�
 
 ### 1. 推到公开 GitHub 仓库
 
-仓库名建议就叫 `dsh-fleet-board`（条目文件名依赖它）。
+仓库名建议就叫 `dsh-atc`（条目文件名依赖它）。
 
 ```powershell
-cd /path/to/dsh-fleet-board
+cd /path/to/dsh-atc
 git init
 git add .
 git commit -m "feat: multi-agent fleet board for DeepSeek Harness"
-git remote add origin https://github.com/littleyellowbicycle/dsh-fleet-board.git
+git remote add origin https://github.com/littleyellowbicycle/dsh-atc.git
 git push -u origin main
 ```
 
@@ -36,9 +36,9 @@ git push -u origin main
 并在 `package.json` 补上（当前故意留空，等仓库地址确定）：
 
 ```json
-"repository": { "type": "git", "url": "git+https://github.com/littleyellowbicycle/dsh-fleet-board.git" },
-"homepage": "https://github.com/littleyellowbicycle/dsh-fleet-board#readme",
-"bugs": { "url": "https://github.com/littleyellowbicycle/dsh-fleet-board/issues" }
+"repository": { "type": "git", "url": "git+https://github.com/littleyellowbicycle/dsh-atc.git" },
+"homepage": "https://github.com/littleyellowbicycle/dsh-atc#readme",
+"bugs": { "url": "https://github.com/littleyellowbicycle/dsh-atc/issues" }
 ```
 
 ### 2. 发布 npm 包（可选，但推荐）
@@ -51,15 +51,15 @@ npm pack --dry-run # 先看会打包哪些文件
 npm publish
 ```
 
-包名 `dsh-fleet-board` 目前**未被占用**（已查 registry 404）。
+包名 `dsh-atc` 目前**未被占用**（已查 registry 404）。
 
 ### 3. 给 awesome-dsh-plugin 提 PR
 
-只加**一个文件** `data/plugins/littleyellowbicycle__dsh-fleet-board.yml`：
+只加**一个文件** `data/plugins/littleyellowbicycle__dsh-atc.yml`：
 
 ```yaml
-url: https://github.com/littleyellowbicycle/dsh-fleet-board
-name: littleyellowbicycle/dsh-fleet-board
+url: https://github.com/littleyellowbicycle/dsh-atc
+name: littleyellowbicycle/dsh-atc
 category: session
 description:
   en: One right-sidebar board listing every local agent's sessions (DSH, codex, opencode, WorkBuddy) with attention-first grouping, folded history and zero model calls.
