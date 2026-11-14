@@ -91,19 +91,101 @@ window.__ModuleLoader__.load({
       slate: '#8b949e',
     }
 
-    /** status → label, dot color, pill tint. */
+    /** status → label, dot color, pill tint, and what the label actually means. */
     const STATUS = {
-      running: { label: '在跑', color: PALETTE.green, soft: 'rgba(47,158,111,.12)' },
-      'needs-you': { label: '等你', color: PALETTE.amber, soft: 'rgba(217,131,36,.14)' },
-      failed: { label: '失败', color: PALETTE.red, soft: 'rgba(217,83,79,.12)' },
-      done: { label: '完成', color: PALETTE.teal, soft: 'rgba(18,176,160,.12)' },
-      stopped: { label: '已停', color: '#6e7781', soft: 'rgba(110,119,129,.12)' },
-      recent: { label: '刚停', color: PALETTE.slate, soft: 'rgba(139,148,158,.12)' },
-      idle: { label: '空闲', color: '#aeb6c0', soft: 'rgba(174,182,192,.14)' },
+      running: {
+        label: '在跑',
+        color: PALETTE.green,
+        soft: 'rgba(47,158,111,.12)',
+        hint: '存储自带 running/active，或刚刚还有动静',
+      },
+      'needs-you': {
+        label: '等你',
+        color: PALETTE.amber,
+        soft: 'rgba(217,131,36,.14)',
+        hint: '存储自带 wait/pending/confirm/approv —— 在等你拍板',
+      },
+      failed: {
+        label: '失败',
+        color: PALETTE.red,
+        soft: 'rgba(217,83,79,.12)',
+        hint: '存储自带 error，且是最近才失败的（更早的失败只算历史）',
+      },
+      done: {
+        label: '完成',
+        color: PALETTE.teal,
+        soft: 'rgba(18,176,160,.12)',
+        hint: '存储自带 completed/archived —— 归档的会话也算完成',
+      },
+      stopped: {
+        label: '已停',
+        color: '#6e7781',
+        soft: 'rgba(110,119,129,.12)',
+        hint: '存储自带 terminated/cancel/stop',
+      },
+      recent: {
+        label: '刚停',
+        color: PALETTE.slate,
+        soft: 'rgba(139,148,158,.12)',
+        hint: '最近动过，但不在运行中',
+      },
+      idle: {
+        label: '无动静',
+        color: '#aeb6c0',
+        soft: 'rgba(174,182,192,.14)',
+        hint: '存储没有自带状态，而且很久没动了 —— 不代表已归档',
+      },
     }
 
-    /** One hue per agent, shared by avatars, chips and the donut. */
-    const TOOL_COLOR = {
+    /**
+     * Only these states are worth a filter chip. 刚停 / 无动静 are catch-all
+     * buckets: they only say "nothing happened lately", and filtering by them
+     * just reproduces the 更早 band.
+     */
+    const FILTERABLE_STATUSES = ['running', 'needs-you', 'failed', 'done']
+
+    /**
+     * Agent identity is a *shape*, not a colour.
+     *
+     * Nine agents cannot live on eight hues: two of them always end up
+     * looking alike, and a colour-blind reader tells none of them apart.
+     * So every agent owns a distinct silhouette, and hue only repeats what
+     * the shape already says. These are abstract marks, not brand logos.
+     */
+    // <brand-icons>
+    /**
+     * Real brand marks, one path each on a 24×24 viewBox. Generated from
+     * simple-icons by `scripts/build-brand-icons.mjs` — do not hand-edit.
+     * A tool absent here keeps its geometric glyph on purpose: no invented logo.
+     */
+    const BRAND_ICONS = {
+      dsh: { hex: '#5786FE', title: "DeepSeek", path: 'M23.748 4.651c-.254-.124-.364.113-.512.233-.051.04-.094.09-.137.137-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.155-.708-.311-.955-.65-.172-.24-.219-.509-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.094.172.187.129.323-.082.28-.18.553-.266.833-.055.179-.137.218-.328.14a5.5 5.5 0 0 1-1.737-1.179c-.857-.828-1.631-1.743-2.597-2.46a12 12 0 0 0-.689-.47c-.985-.957.13-1.743.387-1.836.27-.098.094-.433-.778-.428-.872.003-1.67.295-2.687.685a3 3 0 0 1-.465.136 9.6 9.6 0 0 0-2.883-.101c-1.885.21-3.39 1.1-4.497 2.622C.082 8.776-.231 10.854.152 13.02c.403 2.284 1.568 4.175 3.36 5.653 1.857 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.132-.284 4.994-1.86.47.234.962.328 1.78.398.629.058 1.235-.031 1.705-.129.735-.155.684-.836.418-.961-2.155-1.004-1.682-.595-2.112-.926 1.095-1.295 2.768-3.598 3.284-6.733.05-.346.115-.834.108-1.114-.004-.171.035-.238.23-.257a4.2 4.2 0 0 0 1.545-.475c1.397-.763 1.96-2.016 2.093-3.517.02-.23-.004-.467-.247-.588M11.58 18.168c-2.088-1.642-3.101-2.183-3.52-2.16-.39.024-.32.472-.234.763.09.288.207.487.371.74.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.168-1.361-.801-2.5-1.86-3.301-3.306-.775-1.393-1.225-2.888-1.299-4.482-.02-.385.094-.522.477-.592a4.7 4.7 0 0 1 1.53-.038c2.131.311 3.946 1.264 5.467 2.774.868.86 1.525 1.887 2.202 2.89.72 1.066 1.494 2.082 2.48 2.915.348.291.626.513.892.677-.802.09-2.14.109-3.055-.615zm1.001-6.44a.306.306 0 0 1 .415-.287.3.3 0 0 1 .113.074.3.3 0 0 1 .086.214c0 .17-.136.307-.308.307a.303.303 0 0 1-.306-.307m3.11 1.596c-.2.081-.4.151-.591.16a1.25 1.25 0 0 1-.798-.254c-.274-.23-.47-.358-.551-.758a1.7 1.7 0 0 1 .015-.588c.07-.327-.007-.537-.238-.727-.188-.156-.426-.199-.689-.199a.6.6 0 0 1-.254-.078.253.253 0 0 1-.114-.358 1 1 0 0 1 .192-.21c.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.392.451.462.576.685.915.176.264.336.536.446.848.066.194-.02.353-.25.45' },
+      opencode: { hex: '#000000', title: "OpenCode", path: 'M22 24H2V0h20zM17 4.8H7v14.4h10z' },
+      workbuddy: { hex: '#6C4DFF', title: "CodeBuddy", path: 'M18.636.289a1 1 0 0 0-.11 0c-.18.01-.195.02-.442.24-.716.636-1.722 2.546-2.703 5.137l-.274.72-.499.16c-1.554.498-2.934 1.128-4.157 1.893-1.174.73-1.81 1.207-2.768 2.056l-.578.51-.262-.045c-2.528-.447-4.8-.612-5.843-.43-.414.077-.757.216-.862.35-.092.12-.138.263-.138.474 0 .182.034.414.098.727.265 1.236.952 2.854 2.035 4.78l.7 1.236-.023.466c-.027.499 0 1.27.06 1.793.036.319.031.327-.135.516-.565.647-.708 1.676-.408 2.84h5.364l-.33-.57c-.64-1.108-.96-1.663-1.134-2.177a5.46 5.46 0 0 1 1.564-5.84c.408-.358.962-.678 2.072-1.32l6.38-3.683c1.11-.64 1.665-.96 2.18-1.134A5.46 5.46 0 0 1 24 10.275V6.462l-.117-.06-.504-.25-.357-.662c-.924-1.702-2.41-3.696-3.477-4.666-.4-.364-.655-.517-.91-.535M11.57 17.634a1.26 1.26 0 0 1 1.722.462l1.358 2.35c.842 1.455-1.341 2.717-2.183 1.262l-1.358-2.352a1.26 1.26 0 0 1 .461-1.722m6.802-3.926a1.26 1.26 0 0 1 1.721.46l1.358 2.352c.84 1.455-1.343 2.715-2.183 1.26l-1.358-2.35a1.26 1.26 0 0 1 .462-1.722' },
+      gemini: { hex: '#8E75B2', title: "Google Gemini", path: 'M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81' },
+      minimax: { hex: '#E73562', title: "MiniMax", path: 'M11.43 3.92a.86.86 0 1 0-1.718 0v14.236a1.999 1.999 0 0 1-3.997 0V9.022a.86.86 0 1 0-1.718 0v3.87a1.999 1.999 0 0 1-3.997 0V11.49a.57.57 0 0 1 1.139 0v1.404a.86.86 0 0 0 1.719 0V9.022a1.999 1.999 0 0 1 3.997 0v9.134a.86.86 0 0 0 1.719 0V3.92a1.998 1.998 0 1 1 3.996 0v11.788a.57.57 0 1 1-1.139 0zm10.572 3.105a2 2 0 0 0-1.999 1.997v7.63a.86.86 0 0 1-1.718 0V3.923a1.999 1.999 0 0 0-3.997 0v16.16a.86.86 0 0 1-1.719 0V18.08a.57.57 0 1 0-1.138 0v2a1.998 1.998 0 0 0 3.996 0V3.92a.86.86 0 0 1 1.719 0v12.73a1.999 1.999 0 0 0 3.996 0V9.023a.86.86 0 1 1 1.72 0v6.686a.57.57 0 0 0 1.138 0V9.022a2 2 0 0 0-1.998-1.997' },
+      claude: { hex: '#D97757', title: "Claude", path: 'm4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z' },
+      trae: { hex: '#32F08C', title: "TRAE", path: 'M24 20.5H3.5V17H0V3.5h24ZM3.5 17h17V7h-17Zm8.5-5-2.5 2.5L7 12l2.5-2.5Zm7 0-2.5 2.5L14 12l2.5-2.5z' },
+      cursor: { hex: '#000000', title: "Cursor", path: 'M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23' },
+      windsurf: { hex: '#0B100F', title: "Windsurf", path: 'M23.55 5.067c-1.2038-.002-2.1806.973-2.1806 2.1765v4.8676c0 .972-.8035 1.7594-1.7597 1.7594-.568 0-1.1352-.286-1.4718-.7659l-4.9713-7.1003c-.4125-.5896-1.0837-.941-1.8103-.941-1.1334 0-2.1533.9635-2.1533 2.153v4.8957c0 .972-.7969 1.7594-1.7596 1.7594-.57 0-1.1363-.286-1.4728-.7658L.4076 5.1598C.2822 4.9798 0 5.0688 0 5.2882v4.2452c0 .2147.0656.4228.1884.599l5.4748 7.8183c.3234.462.8006.8052 1.3509.9298 1.3771.313 2.6446-.747 2.6446-2.0977v-4.893c0-.972.7875-1.7593 1.7596-1.7593h.003a1.798 1.798 0 0 1 1.4718.7658l4.9723 7.0994c.4135.5905 1.05.941 1.8093.941 1.1587 0 2.1515-.9645 2.1515-2.153v-4.8948c0-.972.7875-1.7594 1.7596-1.7594h.194a.22.22 0 0 0 .2204-.2202v-4.622a.22.22 0 0 0-.2203-.2203Z' },
+      qwen: { hex: '#6950EF', title: "QWen", path: 'M23.919 14.545 20.817 9.17l1.47-2.544a.56.56 0 0 0 0-.566l-1.633-2.83a.57.57 0 0 0-.49-.283h-6.207L12.487.402a.57.57 0 0 0-.49-.284H8.732a.56.56 0 0 0-.49.284L5.139 5.775h-2.94a.56.56 0 0 0-.49.284L.077 8.887a.56.56 0 0 0 0 .567L3.18 14.83l-1.47 2.545a.56.56 0 0 0 0 .566l1.634 2.83a.57.57 0 0 0 .49.283h6.205l1.47 2.545a.57.57 0 0 0 .49.284h3.266a.57.57 0 0 0 .49-.284l3.104-5.375h2.94a.57.57 0 0 0 .49-.283l1.634-2.828a.55.55 0 0 0-.004-.568M8.733.686l1.634 2.828-1.634 2.828H21.8L20.164 9.17H7.425L5.63 6.06Zm1.306 19.801-6.205-.002 1.634-2.83h3.265L2.201 6.344h3.267q3.182 5.517 6.367 11.032zm10.124-5.66L18.53 12l-6.532 11.315-1.634-2.83c2.129-3.673 4.25-7.351 6.373-11.028h3.592l3.102 5.374z' },
+    }
+    // </brand-icons>
+
+    const AGENT_GLYPH = {
+      dsh: 'disc',
+      codex: 'hex',
+      opencode: 'chevron',
+      workbuddy: 'square',
+      gemini: 'star',
+      zcode: 'zcode',
+      minimax: 'triangle',
+      trae: 'ring',
+      claude: 'asterisk',
+    }
+
+    /** The hue that repeats the shape — never the primary identifier. */
+    const AGENT_COLOR = {
       dsh: PALETTE.blue,
       codex: PALETTE.green,
       opencode: PALETTE.amber,
@@ -111,6 +193,149 @@ window.__ModuleLoader__.load({
       gemini: PALETTE.pink,
       zcode: PALETTE.teal,
       minimax: PALETTE.red,
+      claude: '#d97757',
+      trae: '#3aa0c9',
+    }
+
+    /** Brand hue where one exists, so icon and bar agree. */
+    for (const [tool, icon] of Object.entries(BRAND_ICONS)) {
+      AGENT_COLOR[tool] = icon.hex
+    }
+
+    /** Shape geometry, drawn on a 12×12 grid so every mark is optically equal. */
+    const GLYPH_SHAPES = {
+      disc: [{ tag: 'circle', attrs: { cx: 6, cy: 6, r: 4.2, fill: 'currentColor' } }],
+      hex: [
+        {
+          tag: 'path',
+          attrs: {
+            d: 'M6 1.3 10.1 3.6v4.8L6 10.7 1.9 8.4V3.6z',
+            stroke: 'currentColor',
+            strokeWidth: 1.5,
+            fill: 'none',
+            strokeLinejoin: 'round',
+          },
+        },
+      ],
+      chevron: [
+        {
+          tag: 'path',
+          attrs: {
+            d: 'M4.2 2.6 8 6l-3.8 3.4',
+            stroke: 'currentColor',
+            strokeWidth: 1.7,
+            fill: 'none',
+            strokeLinecap: 'round',
+            strokeLinejoin: 'round',
+          },
+        },
+      ],
+      square: [{ tag: 'rect', attrs: { x: 2, y: 2, width: 8, height: 8, rx: 2.2, fill: 'currentColor' } }],
+      star: [
+        {
+          tag: 'path',
+          attrs: { d: 'M6 .6 7.4 4.6 11.4 6 7.4 7.4 6 11.4 4.6 7.4 .6 6 4.6 4.6z', fill: 'currentColor' },
+        },
+      ],
+      zcode: [
+        {
+          tag: 'path',
+          attrs: {
+            d: 'M2.6 2.9h6.8L2.6 9.1h6.8',
+            stroke: 'currentColor',
+            strokeWidth: 1.6,
+            fill: 'none',
+            strokeLinecap: 'round',
+            strokeLinejoin: 'round',
+          },
+        },
+      ],
+      triangle: [
+        {
+          tag: 'path',
+          attrs: {
+            d: 'M6 2 10.4 9.6H1.6z',
+            stroke: 'currentColor',
+            strokeWidth: 1.5,
+            fill: 'none',
+            strokeLinejoin: 'round',
+          },
+        },
+      ],
+      ring: [
+        { tag: 'circle', attrs: { cx: 6, cy: 6, r: 3.8, stroke: 'currentColor', strokeWidth: 1.6, fill: 'none' } },
+      ],
+      asterisk: [
+        {
+          tag: 'path',
+          attrs: {
+            d: 'M6 1.4v9.2M1.4 6h9.2M2.7 2.7l6.6 6.6M9.3 2.7l-6.6 6.6',
+            stroke: 'currentColor',
+            strokeWidth: 1.4,
+            fill: 'none',
+            strokeLinecap: 'round',
+          },
+        },
+      ],
+      /** Anything we have no mark for yet: a broken ring, clearly "unknown". */
+      dashed: [
+        {
+          tag: 'circle',
+          attrs: {
+            cx: 6,
+            cy: 6,
+            r: 3.8,
+            stroke: 'currentColor',
+            strokeWidth: 1.4,
+            fill: 'none',
+            strokeDasharray: '2 1.9',
+          },
+        },
+      ],
+    }
+
+    /** The mark that identifies an agent; unknown tools fall back to a dashed ring. */
+    function agentGlyph(tool) {
+      return AGENT_GLYPH[tool] || 'dashed'
+    }
+
+    /**
+     * The mark that identifies an agent: the real brand logo when one is
+     * published, the geometric silhouette otherwise.
+     */
+    function AgentGlyph({ tool, size = 12, color }) {
+      const brand = BRAND_ICONS[tool]
+      if (brand) {
+        return h(
+          'svg',
+          {
+            className: 'fb-glyph fb-glyph-brand',
+            width: size,
+            height: size,
+            viewBox: '0 0 24 24',
+            fill: 'currentColor',
+            role: 'img',
+            'aria-label': brand.title,
+            focusable: 'false',
+            style: { color: brand.hex },
+          },
+          h('path', { d: brand.path }),
+        )
+      }
+      return h(
+        'svg',
+        {
+          className: 'fb-glyph',
+          width: size,
+          height: size,
+          viewBox: '0 0 12 12',
+          fill: 'none',
+          'aria-hidden': 'true',
+          focusable: 'false',
+          style: color ? { '--fb-agent-color': color } : undefined,
+        },
+        GLYPH_SHAPES[agentGlyph(tool)].map((part, index) => h(part.tag, { key: index, ...part.attrs })),
+      )
     }
 
     /** Status order used by the stacked bar and the legend. */
@@ -173,6 +398,17 @@ window.__ModuleLoader__.load({
       const date = new Date(ms)
       date.setHours(0, 0, 0, 0)
       return date.getTime()
+    }
+
+    /**
+     * Toggle one filter value. Picking the value that is already selected
+     * releases it — a filter you cannot take off again is a trap.
+     * @param current - the value currently selected ('all' means none).
+     * @param value - the value the user just picked.
+     * @returns the next selection.
+     */
+    function toggleFilter(current, value) {
+      return current === value ? 'all' : value
     }
 
     /**
@@ -261,7 +497,7 @@ window.__ModuleLoader__.load({
       const counts = new Map()
       for (const item of items) counts.set(item.tool, (counts.get(item.tool) || 0) + 1)
       return [...counts.entries()]
-        .map(([tool, value]) => ({ key: tool, label: tool, value, color: TOOL_COLOR[tool] || PALETTE.slate }))
+        .map(([tool, value]) => ({ key: tool, label: tool, value, color: AGENT_COLOR[tool] || PALETTE.slate }))
         .sort((a, b) => b.value - a.value)
     }
 
@@ -434,75 +670,80 @@ window.__ModuleLoader__.load({
       )
     }
 
-    /** One KPI tile: big number, label, optional footnote. */
-    function Kpi({ value, label, note, color }) {
+    /** One KPI tile: big number, label, optional footnote, optional extra. */
+    function Kpi({ value, label, note, color, extra }) {
       return h(
         'div',
         { className: 'fb-kpi' },
         h('div', { className: 'fb-kpi-value', style: color ? { color } : undefined }, value),
         h('div', { className: 'fb-kpi-label' }, label),
+        extra || null,
         note ? h('div', { className: 'fb-kpi-note' }, note) : null,
       )
     }
 
-    /** Donut with a centered total. */
-    function Donut({ segments, total, centerLabel }) {
-      const size = 132
-      const stroke = 15
-      const radius = (size - stroke) / 2
-      const circumference = 2 * Math.PI * radius
-      let offset = 0
-      const arcs = segments.map((segment) => {
-        const length = total > 0 ? (segment.value / total) * circumference : 0
-        const arc = h('circle', {
-          key: segment.key,
-          cx: size / 2,
-          cy: size / 2,
-          r: radius,
-          fill: 'none',
-          stroke: segment.color,
-          strokeWidth: stroke,
-          strokeDasharray: `${length} ${circumference - length}`,
-          strokeDashoffset: -offset,
-          transform: `rotate(-90 ${size / 2} ${size / 2})`,
-        })
-        offset += length
-        return arc
-      })
+    /**
+     * Agent distribution as a ranked bar list.
+     *
+     * A donut with nine agents is nine thin slices of pure colour — the worst
+     * possible way to tell agents apart. Rows give every agent a mark and a
+     * bar: the shape says who, the bar says how much, and the hue only
+     * repeats what the shape already said.
+     */
+    function AgentBars({ rows, total }) {
+      if (rows.length === 0) return h('div', { className: 'fb-agent-bar-empty' }, '没有数据')
+      const max = Math.max(...rows.map((row) => row.value))
       return h(
-        'svg',
-        { width: size, height: size, viewBox: `0 0 ${size} ${size}`, className: 'fb-donut' },
-        h('circle', {
-          cx: size / 2,
-          cy: size / 2,
-          r: radius,
-          fill: 'none',
-          stroke: '#eef0f3',
-          strokeWidth: stroke,
-        }),
-        arcs,
-        h(
-          'text',
-          { x: size / 2, y: size / 2 - 1, textAnchor: 'middle', className: 'fb-donut-value' },
-          String(total),
-        ),
-        h(
-          'text',
-          { x: size / 2, y: size / 2 + 15, textAnchor: 'middle', className: 'fb-donut-label' },
-          centerLabel,
+        'div',
+        { className: 'fb-agent-bars' },
+        rows.map((row) =>
+          h(
+            'div',
+            { className: 'fb-agent-bar', key: row.key, title: `${row.label} · ${row.value} 个会话` },
+            h(AgentGlyph, { tool: row.key, size: 13, color: row.color }),
+            h('span', { className: 'fb-agent-bar-name' }, row.label),
+            h(
+              'span',
+              { className: 'fb-agent-bar-track' },
+              h('i', {
+                style: {
+                  width: `${Math.max(4, (row.value / max) * 100)}%`,
+                  background: row.color,
+                },
+              }),
+            ),
+            h('span', { className: 'fb-agent-bar-count' }, String(row.value)),
+            h(
+              'span',
+              { className: 'fb-agent-bar-pct' },
+              `${total ? Math.round((row.value / total) * 100) : 0}%`,
+            ),
+          ),
         ),
       )
     }
 
-    /** Legend row: swatch, name, share, raw count. */
-    function LegendRow({ color, name, share, count, title }) {
+    /**
+     * One mark per agent in the current view. Marks only, no numbers: the
+     * counts live in the Agent 分布 card right below, and a second set of
+     * numbers here would only ever disagree with it.
+     */
+    function AgentStrip({ rows }) {
+      if (!rows || rows.length === 0) return null
       return h(
         'div',
-        { className: 'fb-legend-row', title: title || name },
-        h('i', { className: 'fb-legend-dot', style: { background: color } }),
-        h('span', { className: 'fb-legend-name' }, name),
-        h('span', { className: 'fb-legend-pct' }, share),
-        h('span', { className: 'fb-legend-count' }, count),
+        { className: 'fb-agent-strip', title: '当前筛选下的 agent' },
+        rows.map((row) =>
+          h(
+            'span',
+            {
+              className: 'fb-agent-strip-item',
+              key: row.key,
+              title: `${row.label} · ${row.value} 个会话`,
+            },
+            h(AgentGlyph, { tool: row.key, size: 13, color: row.color }),
+          ),
+        ),
       )
     }
 
@@ -512,7 +753,7 @@ window.__ModuleLoader__.load({
      */
     function SessionCard({ item, onOpen }) {
       const status = STATUS[item.status] || STATUS.idle
-      const color = TOOL_COLOR[item.tool] || PALETTE.slate
+      const color = AGENT_COLOR[item.tool] || PALETTE.slate
       const clickable = Boolean(item.sessionId)
       const ctx = /ctx\s*(\d+)%/.exec(item.detail || '')
       const extra = item.detail
@@ -546,7 +787,7 @@ window.__ModuleLoader__.load({
           h(
             'span',
             { className: 'fb-tag' },
-            h('i', { className: 'fb-legend-dot', style: { background: color } }),
+            h(AgentGlyph, { tool: item.tool, size: 11, color }),
             item.tool,
           ),
           h('span', { className: 'fb-tag fb-tag-muted', title: item.workspace }, item.workspace),
@@ -556,7 +797,11 @@ window.__ModuleLoader__.load({
           { className: 'fb-session-foot' },
           h(
             'span',
-            { className: 'fb-status', style: { color: status.color, background: status.soft } },
+            {
+              className: 'fb-status',
+              style: { color: status.color, background: status.soft },
+              title: status.hint,
+            },
             h('i', { className: 'fb-status-dot', style: { background: status.color } }),
             status.label,
           ),
@@ -584,9 +829,18 @@ window.__ModuleLoader__.load({
       if (items.length === 0) return null
       const counts = {}
       for (const item of items) counts[item.tool] = (counts[item.tool] || 0) + 1
+      // Which agents are in this band, shown as marks — the same shapes the
+      // chips and the bars use, so the eye can match them across the page.
       const breakdown = Object.entries(counts)
-        .map(([tool, count]) => `${tool} ${count}`)
-        .join(' · ')
+        .sort((a, b) => b[1] - a[1])
+        .map(([tool, count]) =>
+          h(
+            'span',
+            { className: 'fb-group-mix', key: tool },
+            h(AgentGlyph, { tool, size: 10, color: AGENT_COLOR[tool] }),
+            `${tool} ${count}`,
+          ),
+        )
       const shown = open ? items.slice(0, ROW_CAP) : []
       return h(
         'section',
@@ -598,7 +852,11 @@ window.__ModuleLoader__.load({
           h('i', { className: 'fb-group-bar', style: { background: color } }),
           h('span', { className: 'fb-group-title' }, title),
           h('span', { className: 'fb-count' }, String(items.length)),
-          h('span', { className: 'fb-group-hint' }, hint || breakdown),
+          h(
+            'span',
+            { className: 'fb-group-hint' },
+            hint || h('span', { className: 'fb-group-mix-row' }, breakdown),
+          ),
         ),
         open
           ? h(
@@ -712,16 +970,26 @@ window.__ModuleLoader__.load({
       const lastSeen = board && board.items.length ? board.items[0].lastActivity : 0
 
       const filtersActive = query || range !== 'all' || statusFilter !== 'all' || toolFilter !== 'all'
+      // Facet counts: each dimension is counted with the *other* one released,
+      // so the chips keep showing the real split while you toggle them.
+      // Counting inside the current selection would zero out every other chip.
       const statusCounts = useMemo(() => {
         const counts = new Map()
-        for (const item of filtered) counts.set(item.status, (counts.get(item.status) || 0) + 1)
+        const source = board ? filterItems(board.items, { ...filters, status: 'all' }) : []
+        for (const item of source) counts.set(item.status, (counts.get(item.status) || 0) + 1)
         return counts
-      }, [filtered])
+      }, [board, query, range, toolFilter])
       const toolCounts = useMemo(() => {
         const counts = new Map()
-        for (const item of filtered) counts.set(item.tool, (counts.get(item.tool) || 0) + 1)
+        const source = board ? filterItems(board.items, { ...filters, tool: 'all' }) : []
+        for (const item of source) counts.set(item.tool, (counts.get(item.tool) || 0) + 1)
         return counts
-      }, [filtered])
+      }, [board, query, range, statusFilter])
+      // How many sessions the "全部 agent" chip would select.
+      const agentTotal = useMemo(() => {
+        if (!board) return 0
+        return filterItems(board.items, { ...filters, tool: 'all' }).length
+      }, [board, query, range, statusFilter])
 
       const resetFilters = useCallback(() => {
         setQuery('')
@@ -796,6 +1064,7 @@ window.__ModuleLoader__.load({
                 h(Kpi, {
                   value: `${activeTools}/${totalTools}`,
                   label: '接入的 agent',
+                  extra: h(AgentStrip, { rows: tools }),
                   note: (() => {
                     const empty = Math.max(0, totalTools - activeTools - unreadable)
                     const parts = []
@@ -912,26 +1181,7 @@ window.__ModuleLoader__.load({
                     h('span', { className: 'fb-card-title' }, 'Agent 分布'),
                     h('span', { className: 'fb-card-meta' }, `${filtered.length} 个会话`),
                   ),
-                  h(
-                    'div',
-                    { className: 'fb-donut-wrap' },
-                    h(Donut, { segments: tools, total: filtered.length, centerLabel: '会话' }),
-                    h(
-                      'div',
-                      { className: 'fb-legend' },
-                      tools.length === 0
-                        ? h('div', { className: 'fb-legend-row' }, '没有数据')
-                        : tools.map((tool) =>
-                            h(LegendRow, {
-                              key: tool.key,
-                              color: tool.color,
-                              name: tool.label,
-                              share: `${filtered.length ? Math.round((tool.value / filtered.length) * 100) : 0}%`,
-                              count: String(tool.value),
-                            }),
-                          ),
-                    ),
-                  ),
+                  h(AgentBars, { rows: tools, total: filtered.length }),
                 ),
               ),
 
@@ -1009,15 +1259,19 @@ window.__ModuleLoader__.load({
               h(
                 'div',
                 { className: 'fb-filters' },
+                // Two labelled groups instead of two "全部" chips sitting next
+                // to each other and both looking selected.
+                h('span', { className: 'fb-filter-label' }, 'agent'),
                 h(
                   'button',
                   {
                     type: 'button',
                     className: `fb-chip${toolFilter === 'all' ? ' fb-chip-active' : ''}`,
+                    title: '显示所有 agent',
                     onClick: () => setToolFilter('all'),
                   },
-                  '全部 agent',
-                  h('span', { className: 'fb-chip-count' }, String(filtered.length)),
+                  '全部',
+                  h('span', { className: 'fb-chip-count' }, String(agentTotal)),
                 ),
                 // A source that is readable but holds nothing (an empty store)
                 // earns no chip: showing "claude 0" reads like a broken agent.
@@ -1029,17 +1283,16 @@ window.__ModuleLoader__.load({
                     {
                       key: source.tool,
                       type: 'button',
-                      className: `fb-chip${toolFilter === source.tool ? ' fb-chip-active' : ''}${
-                        source.available ? '' : ' fb-chip-off'
-                      }`,
-                      title: source.available
-                        ? `${source.count || 0} 个会话`
-                        : source.reason || '不可用',
-                      onClick: () => (source.available ? setToolFilter(source.tool) : null),
+                      className: `fb-chip${toolFilter === source.tool ? ' fb-chip-active' : ''}`,
+                      title: `${toolCounts.get(source.tool) || 0} 个会话 · 再点一次取消筛选`,
+                      // Clicking the selected chip again releases it: a filter
+                      // you cannot take off is a trap.
+                      onClick: () => setToolFilter((current) => toggleFilter(current, source.tool)),
                     },
-                    h('i', {
-                      className: 'fb-legend-dot',
-                      style: { background: TOOL_COLOR[source.tool] || PALETTE.slate },
+                    h(AgentGlyph, {
+                      tool: source.tool,
+                      size: 12,
+                      color: AGENT_COLOR[source.tool],
                     }),
                     source.tool,
                     h('span', { className: 'fb-chip-count' }, String(toolCounts.get(source.tool) || 0)),
@@ -1062,6 +1315,7 @@ window.__ModuleLoader__.load({
                             ? `${agent.path} — ${agent.reason}`
                             : `检测到 ${agent.path}，但还没有解析器`,
                         },
+                        h(AgentGlyph, { tool: agent.tool, size: 12 }),
                         agent.tool,
                         h('span', { className: 'fb-chip-count' }, agent.reason?.includes('加密') ? '已加密' : '未接入'),
                       ),
@@ -1069,23 +1323,19 @@ window.__ModuleLoader__.load({
                   ]
                 })(),
                 h('span', { className: 'fb-chip-sep' }),
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    className: `fb-chip${statusFilter === 'all' ? ' fb-chip-active' : ''}`,
-                    onClick: () => setStatusFilter('all'),
-                  },
-                  '全部状态',
-                ),
-                STATUS_ORDER.filter((status) => statusCounts.has(status)).map((status) =>
+                h('span', { className: 'fb-filter-label' }, '状态'),
+                // Only the states worth filtering on. 刚停 and 无动静 are the
+                // catch-all buckets: they say "nothing happened lately", and
+                // filtering by them just reproduces the 更早 band.
+                FILTERABLE_STATUSES.filter((status) => statusCounts.has(status)).map((status) =>
                   h(
                     'button',
                     {
                       key: status,
                       type: 'button',
                       className: `fb-chip${statusFilter === status ? ' fb-chip-active' : ''}`,
-                      onClick: () => setStatusFilter(status),
+                      title: `${STATUS[status].hint} · 再点一次取消筛选`,
+                      onClick: () => setStatusFilter((current) => toggleFilter(current, status)),
                     },
                     h('i', { className: 'fb-legend-dot', style: { background: STATUS[status].color } }),
                     STATUS[status].label,
@@ -1159,7 +1409,7 @@ window.__ModuleLoader__.load({
     /* ------------------------------------------------------------------ css */
 
     const CSS = `
-.fb-page{box-sizing:border-box;--fb-line:var(--dsw-alias-border-l1,#e8ebf0);--fb-line-soft:var(--dsw-alias-border-l2,#eff1f4);--fb-surface:var(--dsw-alias-card-fill,#fff);--fb-fill:var(--dsw-alias-interactive-bg-hover,#f3f5f8);--fb-elevated:var(--dsw-alias-button-elevated-fill,#f4f5f7);--fb-hover:var(--dsw-alias-interactive-bg-hover,#f3f5f8);--fb-text:var(--dsw-alias-label-primary,#1f2328);--fb-text-2:var(--dsw-alias-label-secondary,#57606a);--fb-text-3:var(--dsw-alias-label-tertiary,#8b949e);--fb-text-4:var(--dsw-alias-label-quaternary,#a8b0ba);max-width:1180px;margin:0 auto;padding:18px 22px 36px;color:var(--fb-text);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.fb-page{box-sizing:border-box;--fb-line:var(--dsw-alias-border-l1,#e8ebf0);--fb-line-soft:var(--dsw-alias-border-l2,#eff1f4);--fb-surface:var(--dsw-alias-card-fill,#fff);--fb-fill:var(--dsw-alias-interactive-bg-hover,#f3f5f8);--fb-elevated:var(--dsw-alias-button-elevated-fill,#f4f5f7);--fb-hover:var(--dsw-alias-interactive-bg-hover,#f3f5f8);--fb-text:var(--dsw-alias-label-primary,#1f2328);--fb-text-2:var(--dsw-alias-label-secondary,#57606a);--fb-text-3:var(--dsw-alias-label-tertiary,#8b949e);--fb-text-4:var(--dsw-alias-label-quaternary,#a8b0ba);--fb-r-xs:var(--dsw-radius-xs,4px);--fb-r-sm:var(--dsw-radius-sm,8px);--fb-r-md:var(--dsw-radius-md,12px);--fb-r-lg:var(--dsw-radius-lg,16px);max-width:1180px;margin:0 auto;padding:18px 22px 36px;color:var(--fb-text);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
 .fb-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
 .fb-title{display:flex;align-items:center;gap:8px}
 .fb-h1{margin:0;font-size:16px;font-weight:650;letter-spacing:.01em}
@@ -1172,17 +1422,17 @@ window.__ModuleLoader__.load({
 @keyframes fb-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.75)}}
 .fb-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--fb-line);background:var(--fb-elevated);color:var(--fb-text-2);border-radius:7px;padding:4px 11px;font-size:12px;cursor:pointer;font-family:inherit;transition:background .15s,color .15s}
 .fb-btn:hover{background:var(--fb-hover);color:var(--fb-text)}
-.fb-seg{display:inline-flex;align-items:center;gap:2px;padding:2px;border:1px solid var(--fb-line);border-radius:8px;background:var(--fb-fill)}
-.fb-seg-item{border:none;background:transparent;color:var(--fb-text-3);font-family:inherit;font-size:11.5px;padding:3px 10px;border-radius:6px;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s}
+.fb-seg{display:inline-flex;align-items:center;gap:2px;padding:2px;border:1px solid var(--fb-line);border-radius:var(--fb-r-sm);background:var(--fb-fill)}
+.fb-seg-item{border:none;background:transparent;color:var(--fb-text-3);font-family:inherit;font-size:11.5px;padding:3px 10px;border-radius:var(--fb-r-xs);cursor:pointer;white-space:nowrap;transition:background .15s,color .15s}
 .fb-seg-item:hover{color:var(--fb-text)}
 .fb-seg-item-active{background:var(--fb-text);color:var(--fb-surface)}
 .fb-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px}
-.fb-kpi{border:1px solid var(--fb-line);border-radius:12px;padding:12px 14px;background:var(--fb-fill)}
+.fb-kpi{border:1px solid var(--fb-line);border-radius:var(--fb-r-md);padding:12px 14px;background:var(--fb-fill)}
 .fb-kpi-value{font-size:22px;font-weight:650;line-height:1.15;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 .fb-kpi-label{margin-top:3px;font-size:11.5px;color:var(--fb-text-2)}
 .fb-kpi-note{margin-top:1px;font-size:10.5px;color:var(--fb-text-4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fb-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:12px;margin-bottom:12px}
-.fb-card{border:1px solid var(--fb-line);border-radius:12px;background:var(--fb-surface);padding:14px 16px}
+.fb-card{border:1px solid var(--fb-line);border-radius:var(--fb-r-md);background:var(--fb-surface);padding:14px 16px}
 .fb-card-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:12px}
 .fb-card-title{font-size:13px;font-weight:600}
 .fb-card-meta{font-size:11px;color:var(--fb-text-4)}
@@ -1200,16 +1450,18 @@ window.__ModuleLoader__.load({
 .fb-heat-stat b{font-size:15px;font-weight:650;color:var(--fb-text);font-variant-numeric:tabular-nums}
 .fb-heat-legend{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--fb-text-4);margin-top:14px}
 .fb-heat-legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
-.fb-donut-wrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
-.fb-donut{flex:none}
-.fb-donut-value{font-size:19px;font-weight:650;fill:var(--fb-text)}
-.fb-donut-label{font-size:10px;fill:var(--fb-text-4)}
-.fb-legend{flex:1;min-width:150px;display:flex;flex-direction:column;gap:7px}
-.fb-legend-row{display:flex;align-items:center;gap:8px;font-size:12px}
+.fb-glyph{display:inline-block;flex:none;color:var(--fb-agent-color,currentColor)}
+.fb-agent-bars{display:flex;flex-direction:column;gap:8px}
+.fb-agent-bar{display:flex;align-items:center;gap:9px;font-size:12px}
+.fb-agent-bar-name{width:76px;flex:none;color:var(--fb-text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fb-agent-bar-track{flex:1;min-width:48px;height:7px;border-radius:999px;background:var(--fb-line-soft);overflow:hidden}
+.fb-agent-bar-track i{display:block;height:100%;border-radius:999px}
+.fb-agent-bar-count{width:32px;flex:none;text-align:right;color:var(--fb-text-3);font-size:11px;font-variant-numeric:tabular-nums}
+.fb-agent-bar-pct{width:34px;flex:none;text-align:right;color:var(--fb-text-4);font-size:11px;font-variant-numeric:tabular-nums}
+.fb-agent-bar-empty{font-size:12px;color:var(--fb-text-4)}
+.fb-agent-strip{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:7px}
+.fb-agent-strip-item{display:inline-flex;align-items:center;flex:none}
 .fb-legend-dot{width:8px;height:8px;border-radius:2px;display:inline-block;flex:none}
-.fb-legend-name{color:var(--fb-text-2)}
-.fb-legend-pct{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums}
-.fb-legend-count{color:var(--fb-text-4);font-size:11px;font-variant-numeric:tabular-nums;min-width:30px;text-align:right}
 .fb-statusbar{margin-bottom:4px}
 .fb-statusbar-track{display:flex;height:8px;border-radius:999px;overflow:hidden;background:var(--fb-line-soft)}
 .fb-statusbar-seg{height:100%;display:block}
@@ -1219,22 +1471,24 @@ window.__ModuleLoader__.load({
 .fb-list-title{font-size:14px;font-weight:650}
 .fb-list-meta{font-size:11px;color:var(--fb-text-4)}
 .fb-list-tools{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.fb-search{display:flex;align-items:center;gap:6px;border:1px solid var(--fb-line);border-radius:8px;padding:4px 10px;background:var(--fb-surface);min-width:190px;color:var(--fb-text-4)}
+.fb-search{display:flex;align-items:center;gap:6px;border:1px solid var(--fb-line);border-radius:var(--fb-r-sm);padding:4px 10px;background:var(--fb-surface);min-width:190px;color:var(--fb-text-4)}
 .fb-search:focus-within{border-color:var(--fb-blue,#4c7cf3)}
 .fb-search input{border:none;outline:none;background:transparent;font-family:inherit;font-size:12px;color:var(--fb-text);width:100%}
 .fb-search input::placeholder{color:var(--fb-text-4)}
-.fb-filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
-.fb-chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:3px 10px;border-radius:999px;border:1px solid var(--fb-line);background:var(--fb-surface);color:var(--fb-text-2);cursor:pointer;font-family:inherit;transition:background .15s,color .15s}
+.fb-filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:12px}
+.fb-filter-label{font-size:10.5px;color:var(--fb-text-4);margin-right:1px;user-select:none;white-space:nowrap}
+.fb-chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:3px 10px;border-radius:var(--fb-r-sm);border:1px solid var(--fb-line);background:var(--fb-surface);color:var(--fb-text-2);cursor:pointer;font-family:inherit;transition:background .15s,color .15s,border-color .15s}
 .fb-chip:hover{background:var(--fb-hover)}
 .fb-chip-active{background:var(--fb-text);border-color:var(--fb-text);color:var(--fb-surface)}
 .fb-chip-active:hover{background:var(--fb-text);opacity:.9}
+.fb-chip-active .fb-glyph{color:inherit}
 .fb-chip-off{color:var(--fb-text-4);border-style:dashed;cursor:default}
 .fb-chip-off:hover{background:transparent}
 .fb-chip-muted{opacity:.75;cursor:default}
 .fb-chip-count{font-size:10.5px;color:var(--fb-text-4);font-variant-numeric:tabular-nums}
-.fb-chip-sep{width:1px;height:15px;background:var(--fb-line);margin:0 3px;flex:none}
+.fb-chip-sep{width:1px;height:15px;background:var(--fb-line);margin:0 4px;flex:none}
 .fb-chip-active .fb-chip-count{color:rgba(255,255,255,.72)}
-.fb-chip-reset{border-style:dashed;color:var(--fb-text-3)}
+.fb-chip-reset{border-style:dashed;color:var(--fb-text-3);margin-left:auto}
 .fb-clear{display:flex;align-items:center;gap:8px;padding:10px 12px;margin-bottom:10px;border:1px solid rgba(47,158,111,.25);background:rgba(47,158,111,.07);border-radius:10px;font-size:12px;color:#2f9e6f}
 .fb-group{margin-bottom:8px}
 .fb-group-head{display:flex;align-items:center;gap:8px;width:100%;border:none;background:transparent;color:inherit;font-family:inherit;font-size:12px;font-weight:600;padding:8px 4px;cursor:pointer;text-align:left}
@@ -1243,8 +1497,10 @@ window.__ModuleLoader__.load({
 .fb-group-title{color:var(--fb-text)}
 .fb-count{font-size:11px;font-weight:600;color:var(--fb-text-3);background:var(--fb-fill);border:1px solid var(--fb-line);border-radius:999px;padding:0 7px;font-variant-numeric:tabular-nums}
 .fb-group-hint{margin-left:auto;font-size:11px;font-weight:400;color:var(--fb-text-4)}
+.fb-group-mix-row{display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fb-group-mix{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .fb-session-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:9px}
-.fb-session{display:flex;flex-direction:column;gap:7px;border:1px solid var(--fb-line);border-radius:12px;background:var(--fb-surface);padding:12px 13px;transition:border-color .15s,box-shadow .15s}
+.fb-session{display:flex;flex-direction:column;gap:7px;border:1px solid var(--fb-line);border-radius:var(--fb-r-md);background:var(--fb-surface);padding:12px 13px;transition:border-color .15s,box-shadow .15s}
 .fb-session-clickable{cursor:pointer}
 .fb-session-clickable:hover{border-color:#c3d0f6;box-shadow:0 4px 14px rgba(20,28,45,.07)}
 .fb-session-top{display:flex;align-items:flex-start;gap:10px}
@@ -1252,7 +1508,7 @@ window.__ModuleLoader__.load({
 .fb-session-time{flex:none;font-size:11px;color:var(--fb-text-4);font-variant-numeric:tabular-nums;white-space:nowrap;padding-top:1px}
 .fb-session-date{font-size:10.5px;color:var(--fb-text-4);font-variant-numeric:tabular-nums;margin-top:-3px}
 .fb-session-tags{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
-.fb-tag{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:var(--fb-text-2);background:var(--fb-fill);border:1px solid var(--fb-line);border-radius:6px;padding:1px 7px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fb-tag{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:var(--fb-text-2);background:var(--fb-fill);border:1px solid var(--fb-line);border-radius:var(--fb-r-xs);padding:1px 7px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fb-tag-muted{color:var(--fb-text-3)}
 .fb-session-foot{margin-top:auto;padding-top:9px;border-top:1px solid var(--fb-line-soft);display:flex;align-items:center;gap:10px}
 .fb-session-ctx{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--fb-text-3);font-variant-numeric:tabular-nums}
@@ -1308,7 +1564,7 @@ window.__ModuleLoader__.load({
       inject,
       apply,
       /** Seams for the offline render check; the host never reads these. */
-      __test: { FleetPage, store, refresh },
+      __test: { FleetPage, store, refresh, toggleFilter, AGENT_GLYPH, agentGlyph },
     }
   },
 })

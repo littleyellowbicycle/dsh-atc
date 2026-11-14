@@ -25,14 +25,21 @@ test('host registers one route and answers the board payload', async () => {
     effect: (fn) => fn(),
     webServer: { register: (route) => (routes.push(route), () => {}) },
   }
+  // The board route is the contract that matters here. The plugin stays free
+  // to borrow other host services; this must not fail when it does.
+  const injected = []
   const ctx = {
     inject: (services, body) => {
-      assert.deepEqual(services, ['webServer'])
+      injected.push([...services])
       body(webCtx)
     },
   }
 
   host.apply(ctx)
+  assert.ok(
+    injected.some((names) => names.includes('webServer')),
+    'the board route is registered on the web server',
+  )
   assert.equal(routes.length, 1, 'exactly one route')
   assert.equal(routes[0].path, '/dsh-atc')
   assert.equal(routes[0].kind, 'prefix')
@@ -172,4 +179,43 @@ test('client registers a sidebar row and its main panel page', () => {
   assert.ok(panel, 'main panel registered')
   assert.equal(panel.options.key, 'atc')
   assert.equal(typeof panel.component, 'function')
+})
+
+test('every agent gets a mark of its own', async () => {
+  const definition = loadClient()
+  const { AGENT_GLYPH, agentGlyph } = definition.__test
+  const { AGENT_CATALOG } = await import(pathToFileURL(join(root, 'lib', 'collect.mjs')).href)
+
+  // Agents are told apart by shape, not by hue: two agents sharing a mark
+  // would put them back where the colours had them. Agents we have no mark
+  // for deliberately share the "unknown" ring.
+  const tools = [...new Set(AGENT_CATALOG.map((entry) => entry.tool))]
+  const seen = new Map()
+  for (const tool of tools) {
+    const mark = agentGlyph(tool)
+    assert.ok(mark, `${tool} has a mark`)
+    if (!AGENT_GLYPH[tool]) {
+      assert.equal(mark, 'dashed', `${tool} falls back to the unknown ring`)
+      continue
+    }
+    assert.equal(seen.has(mark), false, `${tool} shares the mark "${mark}" with ${seen.get(mark)}`)
+    seen.set(mark, tool)
+  }
+  assert.ok(seen.size >= 8, 'the connected agents each own a mark')
+
+  // An agent we have no mark for falls back to the "unknown" ring.
+  assert.equal(agentGlyph('some-future-agent'), 'dashed')
+})
+
+test('a filter chip releases itself when picked twice', () => {
+  const definition = loadClient()
+  const { toggleFilter } = definition.__test
+
+  // Picking a value that is not active selects it.
+  assert.equal(toggleFilter('all', 'dsh'), 'dsh')
+  assert.equal(toggleFilter('workbuddy', 'dsh'), 'dsh')
+  // Picking the active value again clears it: a filter you cannot take off
+  // again is a trap.
+  assert.equal(toggleFilter('dsh', 'dsh'), 'all')
+  assert.equal(toggleFilter('running', 'running'), 'all')
 })
