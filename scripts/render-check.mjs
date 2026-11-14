@@ -35,7 +35,7 @@ function loadClient() {
   sandbox.window = {
     __ModuleLoader__: {
       load: ({ id, factory }) => {
-        if (id !== 'dsh-fleet-board') throw new Error(`unexpected id ${id}`)
+        if (id !== 'dsh-atc') throw new Error(`unexpected id ${id}`)
         definition = factory((spec) => {
           if (spec === 'react') return { ...ReactForBundle }
           throw new Error(`unexpected require(${spec})`)
@@ -79,7 +79,7 @@ if (missing.length > 0) {
   console.error(`✗ rows did not render: ${missing.join(' | ')}`)
   process.exit(1)
 }
-for (const expected of ['多 Agent 看板', '在跑', '等你', '活跃度', 'Agent 分布', '状态分布', '会话']) {
+for (const expected of ['Agent 空管中心', '在跑', '等你', '活跃度', 'Agent 分布', '状态分布', '会话']) {
   if (!html.includes(expected)) {
     console.error(`✗ missing text: ${expected}`)
     process.exit(1)
@@ -88,7 +88,7 @@ for (const expected of ['多 Agent 看板', '在跑', '等你', '活跃度', 'Ag
 
 writeFileSync(
   join(root, 'render-check.html'),
-  `<!doctype html><meta charset="utf-8"><title>dsh-fleet-board render check</title>
+  `<!doctype html><meta charset="utf-8"><title>dsh-atc render check</title>
 <body style="margin:0;background:#fff;color:#1b1d21;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
 <style>:root{--dsw-alias-label-primary:#1b1d21;--dsw-alias-label-secondary:#4a5568;--dsw-alias-label-tertiary:#6b7280;--dsw-alias-label-quaternary:#9aa3b2;--dsw-alias-label-error:#c0392b;--dsw-alias-border-l1:#eceef1;--dsw-alias-border-l2:#dfe3e8;--dsw-alias-separator-primary:#eceef1;--dsw-alias-card-fill:#fafbfc;--dsw-alias-background-primary:#fff;--dsw-alias-button-elevated-fill:#f4f5f7;--dsw-alias-interactive-bg-hover:#f2f4f7;--dsw-alias-state-success-primary:#2f9e6f;--dsw-alias-state-warn-primary:#d98324;--dsw-alias-state-error-primary:#c0392b;--dsw-alias-state-error-secondary:#f3c2bd;--dsw-alias-state-business-primary:#7048e8;--dsw-alias-brand-primary:#4c6ef5}</style>
 ${html}

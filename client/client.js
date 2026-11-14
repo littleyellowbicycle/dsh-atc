@@ -1,5 +1,5 @@
 /**
- * dsh-fleet-board — browser half.
+ * dsh-atc — browser half.
  *
  * Adds a global main panel (a sidebar row like Plugins / Automations) that
  * lists every local agent session. The host already did all inference; this
@@ -17,8 +17,8 @@ window.__ModuleLoader__.load({
     const { useCallback, useEffect, useMemo, useState } = React
     const h = React.createElement
 
-    const PANEL_ID = 'fleet-board'
-    const ENDPOINT = '/dsh-fleet-board/data'
+    const PANEL_ID = 'atc'
+    const ENDPOINT = '/dsh-atc/data'
     const POLL_MS = 5000
     const ROW_CAP = 60
     const DAY = 86_400_000
@@ -108,6 +108,7 @@ window.__ModuleLoader__.load({
       codex: PALETTE.green,
       opencode: PALETTE.amber,
       workbuddy: PALETTE.purple,
+      gemini: PALETTE.pink,
     }
 
     /** Status order used by the stacked bar and the legend. */

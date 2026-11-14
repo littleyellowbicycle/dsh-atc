@@ -20,7 +20,7 @@
     "sidebar",
     "multi-agent",
     "attention",
-    "fleet",
+    "atc",
     "session"
   ],
   "engines": {
@@ -49,8 +49,9 @@
   "files": [
     "lib",
     "client",
+    "assets",
     "cordis.patch.yml",
-    "fleet-board.example.json",
+    "atc.example.json",
     "README.md",
     "LICENSE"
   ],
@@ -59,6 +60,7 @@
     "test": "node --test tests/contract.test.mjs",
     "probe": "node scripts/probe.mjs",
     "render-check": "node scripts/render-check.mjs",
+    "export-icon": "node scripts/export-icon.mjs 512",
     "live-check": "node scripts/live-check.mjs",
     "prepublishOnly": "npm run check && npm test"
   },

@@ -42,7 +42,7 @@ if (!EDGE) {
 }
 
 const PORT = 9333
-const profile = mkdtempSync(join(tmpdir(), 'dsh-fleet-edge-'))
+const profile = mkdtempSync(join(tmpdir(), 'dsh-atc-edge-'))
 const edge = spawn(
   EDGE,
   [

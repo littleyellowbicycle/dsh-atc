@@ -34,7 +34,7 @@ test('host registers one route and answers the board payload', async () => {
 
   host.apply(ctx)
   assert.equal(routes.length, 1, 'exactly one route')
-  assert.equal(routes[0].path, '/dsh-fleet-board')
+  assert.equal(routes[0].path, '/dsh-atc')
   assert.equal(routes[0].kind, 'prefix')
 
   const answer = async (url) => {
@@ -52,7 +52,7 @@ test('host registers one route and answers the board payload', async () => {
     return state
   }
 
-  const ok = await answer('/dsh-fleet-board/data')
+  const ok = await answer('/dsh-atc/data')
   assert.equal(ok.status, 200)
   assert.match(ok.headers['content-type'], /application\/json/)
   const board = JSON.parse(ok.body)
@@ -84,7 +84,7 @@ test('host registers one route and answers the board payload', async () => {
     )
   }
 
-  const miss = await answer('/dsh-fleet-board/nope')
+  const miss = await answer('/dsh-atc/nope')
   assert.equal(miss.status, 404)
 })
 
@@ -163,12 +163,12 @@ test('client registers a sidebar row and its main panel page', () => {
   const panel = slots.find((entry) => entry.options.name === 'main')
 
   assert.ok(row, 'sidebar.panellist registered')
-  assert.equal(row.options.id, 'fleet-board')
+  assert.equal(row.options.id, 'atc')
   assert.equal(typeof row.options.label, 'function')
   assert.equal(row.options.label(), '空管')
   assert.equal(typeof row.component, 'function', 'icon is the second positional argument')
 
   assert.ok(panel, 'main panel registered')
-  assert.equal(panel.options.key, 'fleet-board')
+  assert.equal(panel.options.key, 'atc')
   assert.equal(typeof panel.component, 'function')
 })

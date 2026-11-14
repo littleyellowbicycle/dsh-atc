@@ -1,6 +1,10 @@
 # Agent 空管中心（dsh-atc）
 
-DeepSeek Harness 的多 Agent 空管中心：在**左侧栏**加一行（和「插件」「自动化任务」并列），点开就是全屏面板，一屏看完**本机所有 agent** 正在干什么。
+<p align="center">
+  <img src="assets/icon-256.png" width="112" alt="Agent 空管中心">
+</p>
+
+DeepSeek Harness 的 Agent 空管中心：在**左侧栏**加一行（和「插件」「自动化任务」并列），点开就是全屏面板，一屏看完**本机所有 agent** 正在干什么。
 
 零 token —— 宿主侧只读本地会话存储、纯本地推断状态，不经过任何模型。
 
@@ -58,7 +62,9 @@ Trae / MiniMax 暂无稳定结构化字段，待补。任何一个源失败只�
 
 ## 可调参数
 
-宿主每次轮询都会读 `$DSH_HOME/fleet-board.json`（不存在就用默认值），**改完不用重启**：
+宿主每次轮询都会读 `$DSH_HOME/atc.json`（不存在就用默认值），**改完不用重启**：
+
+> 改名之前叫 `fleet-board.json`，仍然兼容：两个文件都存在时以 `atc.json` 为准。
 
 ```json
 { "perSource": 40, "runningSeconds": 120, "recentMinutes": 30, "attentionHours": 24 }
@@ -71,7 +77,7 @@ Trae / MiniMax 暂无稳定结构化字段，待补。任何一个源失败只�
 | `recentMinutes` | 「最近动过 / 更早」的分界 |
 | `attentionHours` | 失败态只在这么多小时内算「要你处理」，更早的失败是历史 |
 
-模板见 [fleet-board.example.json](fleet-board.example.json)。
+模板见 [atc.example.json](atc.example.json)。
 
 ## 状态词典
 
@@ -131,9 +137,10 @@ cd "$env:USERPROFILE\.dsh\profiles\desktop"
 ## 本地开发
 
 ```powershell
-node scripts/probe.mjs        # 不开 DSH，直接打印看板数据（dry run）
+node scripts/probe.mjs        # 不开 DSH，直接打印面板数据（dry run）
 node --test tests/contract.test.mjs   # 宿主路由 + 客户端接线的契约测试
 node scripts/render-check.mjs # 用真 React 把真数据渲染成 HTML，产出 render-check.html
+node scripts/export-icon.mjs 512 # 把 assets/icon.svg 渲染成透明底 PNG
 node --check lib/index.js     # 语法检查
 ```
 

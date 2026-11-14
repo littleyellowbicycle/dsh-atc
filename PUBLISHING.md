@@ -26,7 +26,7 @@ dshmarket 的 README 写得很直白：*「市场里的插件列表来自精选�
 cd /path/to/dsh-atc
 git init
 git add .
-git commit -m "feat: multi-agent fleet board for DeepSeek Harness"
+git commit -m "feat: Agent 空管中心 for DeepSeek Harness"
 git remote add origin https://github.com/littleyellowbicycle/dsh-atc.git
 git push -u origin main
 ```
