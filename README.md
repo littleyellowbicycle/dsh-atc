@@ -119,6 +119,19 @@ DeepSeek Harness 的 Agent 空管中心：在**左侧栏**加一行（和「插�
 
 模板见 [atc.example.json](atc.example.json)。
 
+## DSH 的状态来自日志事件
+
+DSH 的存储里没有状态列，所以它的「在跑 / 完成 / 失败」不看文件时间，而是读会话日志里最后那一对事件：
+
+```
+turn/start           → 有未结束的轮次 ⇒ 在跑
+turn/end.reason.kind → completed / error / aborted / approval / …
+```
+
+映射：`approval|blocked` → 等你，`error` → 失败，`aborted|interrupted` → 已停；`completed` 只表示「这一轮结束了」，所以按时间衰减成刚停 / 无动静，不会一直挂着「在跑」。
+
+代价是每次会话有写入时要多解一小段日志尾部（倒退最多 24 帧就停），并且按 mtime 记忆 —— 40 个会话冷启 270 ms、热 23 ms。
+
 ## 状态词典
 
 各源的自带状态按这套规则映射，不猜：

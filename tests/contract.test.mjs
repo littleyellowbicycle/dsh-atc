@@ -219,3 +219,28 @@ test('a filter chip releases itself when picked twice', () => {
   assert.equal(toggleFilter('dsh', 'dsh'), 'all')
   assert.equal(toggleFilter('running', 'running'), 'all')
 })
+
+test('statusFromTurn trusts the turn boundaries over file age', async () => {
+  const { statusFromTurn } = await import(pathToFileURL(join(root, 'lib', 'collect.mjs')).href)
+  const now = Date.now()
+  const recent = now - 60_000
+  const old = now - 5 * 3600_000
+
+  // A turn that started and has not ended is the only honest "running".
+  assert.equal(statusFromTurn({ lastStart: recent, lastEnd: null }, old, now), 'running')
+  assert.equal(
+    statusFromTurn({ lastStart: now - 1000, lastEnd: { time: now - 2000, reason: 'completed' } }, old, now),
+    'running',
+  )
+  // Ended reasons outrank age.
+  assert.equal(statusFromTurn({ lastStart: old, lastEnd: { time: recent, reason: 'approval' } }, old, now), 'needs-you')
+  assert.equal(statusFromTurn({ lastStart: old, lastEnd: { time: recent, reason: 'error' } }, old, now), 'failed')
+  assert.equal(statusFromTurn({ lastStart: old, lastEnd: { time: recent, reason: 'abortedByUser' } }, old, now), 'stopped')
+  // A plain completion means quiet now, so it decays instead of claiming running.
+  assert.equal(statusFromTurn({ lastStart: old, lastEnd: { time: recent, reason: 'completed' } }, recent, now), 'recent')
+  assert.equal(statusFromTurn({ lastStart: old, lastEnd: { time: old, reason: 'completed' } }, old, now), 'idle')
+  // No turn facts at all: fall back to the age rule (which itself treats a
+  // two-minute-old file as still running, by design).
+  assert.equal(statusFromTurn({ lastStart: 0, lastEnd: null }, now - 5 * 60_000, now), 'recent')
+  assert.equal(statusFromTurn({ lastStart: 0, lastEnd: null }, now - 30_000, now), 'running')
+})
