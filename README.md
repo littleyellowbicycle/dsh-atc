@@ -158,8 +158,11 @@ node scripts/probe.mjs        # 不开 DSH，直接打印面板数据（dry run�
 node --test tests/contract.test.mjs   # 宿主路由 + 客户端接线的契约测试
 node scripts/render-check.mjs # 用真 React 把真数据渲染成 HTML，产出 render-check.html
 node scripts/export-icon.mjs 512 # 把 assets/icon.svg 渲染成透明底 PNG
+node scripts/audit-privacy.mjs # 发布前脱敏自查（非零退出即不合格）
 node --check lib/index.js     # 语法检查
 ```
+
+`npm publish` 前会自动跑 `check → test → audit:privacy`（`prepublishOnly`）。脱敏自查拦三类东西：**绝对路径**（含当前用户的 home 目录）、**一次性观察**（文件体量、文件头、表名这类只对某台机器成立的细节）、**疑似密钥与个人邮箱**。
 
 改了 `lib/` 要重启桌面端；改了 `client/client.js` 刷新页面即可（link 安装，文件就地生效）。
 
