@@ -73,7 +73,7 @@ test('host registers one route and answers the board payload', async () => {
   }
   for (const item of board.items) {
     assert.ok(
-      ['dsh', 'codex', 'opencode', 'workbuddy', 'gemini'].includes(item.tool),
+      ['dsh', 'codex', 'opencode', 'workbuddy', 'gemini', 'zcode', 'minimax'].includes(item.tool),
       `tool ${item.tool}`,
     )
     assert.equal(typeof item.workspace, 'string')

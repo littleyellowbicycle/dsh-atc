@@ -20,8 +20,11 @@ DeepSeek Harness 的 Agent 空管中心：在**左侧栏**加一行（和「插�
 | codex | `~/.codex/sessions/**/rollout-*.jsonl` | 文件 mtime + 头部 `cwd` / `model_provider` |
 | opencode | `~/.local/share/opencode/opencode.db` | sqlite（`session` + `message.time_updated`） |
 | workbuddy | `~/.workbuddy/workbuddy.db` | sqlite（`sessions.status/last_activity_at`） |
+| gemini | `~/.gemini/tmp/<project>/chats/session-*.json` | 每 chat 一个 JSON，mtime + `.project_root` |
+| zcode | `~/.zcode/cli/db/db.sqlite` | sqlite（`session` + `message.time_updated`，与 opencode 同构） |
+| minimax | `~/.minimax/v2/sqlite/runtime-state.sqlite` | sqlite（`local_runtime_sessions.status/updated_at_ms` + 记录里的 `workspaceDir`） |
 
-Trae / MiniMax 暂无稳定结构化字段，待补。任何一个源失败只降级该源（UI 上标 `✕`），不影响整板。
+读不了的会单独标出来，而不是假装不存在：看板探测 14 个候选工具，**能读的进列表，不能读的进 chip 行的「未接入」**（悬停显示探测到它时的路径）。目前读不了的是 Trae（`ModularData/ai-agent/database.db` 不是标准 SQLite，疑似加密容器）、Claude Code（这台机器上没有 `~/.claude/projects/` 会话目录）、Qoder（未安装）。任何一个源失败只降级该源，不影响整板。
 
 ## 界面怎么排
 

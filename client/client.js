@@ -109,6 +109,8 @@ window.__ModuleLoader__.load({
       opencode: PALETTE.amber,
       workbuddy: PALETTE.purple,
       gemini: PALETTE.pink,
+      zcode: PALETTE.teal,
+      minimax: PALETTE.red,
     }
 
     /** Status order used by the stacked bar and the legend. */
