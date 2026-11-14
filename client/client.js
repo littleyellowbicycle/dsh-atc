@@ -965,8 +965,11 @@ window.__ModuleLoader__.load({
     }
 
     /** Collapsible band of sessions. */
-    function Group({ title, items, color, defaultOpen, onOpen, onMenu, starSet, onStar, hint }) {
+    function Group({ title, items, color, defaultOpen, onOpen, onMenu, starSet, onStar, hint, recentMs }) {
       const [open, setOpen] = useState(defaultOpen)
+      // Opening a band of 137 rows is not readable; start with the recent ones
+      // and let the reader ask for the rest rather than dumping history.
+      const [showAll, setShowAll] = useState(false)
       if (items.length === 0) return null
       const counts = {}
       for (const item of items) counts[item.tool] = (counts[item.tool] || 0) + 1
@@ -982,7 +985,10 @@ window.__ModuleLoader__.load({
             `${tool} ${count}`,
           ),
         )
-      const shown = open ? items : []
+      const cutoff = !recentMs || showAll ? 0 : Date.now() - recentMs
+      const opened = open ? items : []
+      const shown = cutoff ? opened.filter((item) => item.lastActivity >= cutoff) : opened
+      const withheld = opened.length - shown.length
       return h(
         'section',
         { className: 'fb-group' },
@@ -1004,6 +1010,13 @@ window.__ModuleLoader__.load({
               'div',
               { className: 'fb-session-grid' },
               shown.map((item) => h(SessionCard, { key: `${item.tool}:${item.key}`, item, onOpen, onMenu, starred: Boolean(starSet && starSet.has(itemKey(item))), onStar })),
+            )
+          : null,
+        withheld > 0
+          ? h(
+              'button',
+              { type: 'button', className: 'fb-more', onClick: () => setShowAll(true) },
+              `还有 ${withheld} 条更早的 · 显示全部`,
             )
           : null,
       )
@@ -1694,7 +1707,10 @@ function EmptyState({ board }) {
                 starSet: starred,
                 onStar: toggleStar,
                 onOpen,
-                hint: '点开查看',
+                // A collapsed band of history is fine; expanding it to 137 rows
+                // is not, so it opens to the last week first.
+                recentMs: 7 * DAY,
+                hint: '近 7 天 · 点开查看',
               }),
             ),
 
@@ -1840,6 +1856,9 @@ function EmptyState({ board }) {
 .fb-session:hover .fb-star,.fb-star-on{opacity:1}
 .fb-star:hover{color:#d9a520}
 .fb-star-on{color:#d9a520}
+/* The tail of a long band: one quiet row instead of a wall of history. */
+.fb-more{display:block;width:100%;margin-top:8px;padding:9px;border:1px dashed var(--fb-line);border-radius:var(--fb-r-sm);background:none;color:var(--fb-text-3);font-size:11.5px;cursor:pointer;font-family:inherit}
+.fb-more:hover{background:var(--fb-fill);color:var(--fb-text-2)}
 /* Right-click menu: floats above the board, clamped to the viewport. */
 .fb-menu{position:fixed;z-index:60;padding:6px;background:var(--fb-surface);border:1px solid var(--fb-line);border-radius:var(--fb-r-sm);box-shadow:0 12px 32px rgba(15,23,42,.18);display:flex;flex-direction:column;gap:1px}
 .fb-menu-item{display:flex;align-items:center;gap:8px;width:100%;padding:7px 9px;border:0;border-radius:var(--fb-r-xs);background:none;color:var(--fb-text);font-size:12px;text-align:left;cursor:pointer;font-family:inherit}
