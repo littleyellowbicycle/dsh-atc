@@ -28,17 +28,17 @@ DeepSeek Harness 的 Agent 空管中心：在**左侧栏**加一行（和「插�
 
 ## 读不了的 agent，为什么，以及有没有办法
 
+探测到但读不了的工具，会在 chip 行末尾以虚线 chip 出现（如 `trae 已加密`），悬停显示探测到的路径和原因。**可读但为空的源不出现**——空库不代表这个 agent 坏了，没必要占一行。
+
 | 工具 | 现状 | 原因 |
 |---|---|---|
 | **Trae**（IDE / SOLO） | chip 显示 `trae 已加密` | 会话在 `%APPDATA%\Trae CN\ModularData\ai-agent\database.db`（≈151 MB），文件头不是 `SQLite format 3`，是 **SQLCipher 加密库**；`state.vscdb` 倒能打开，但里面只有主题、模型列表、最近打开路径，没有对话 |
-| **Claude Code** | chip 显示 `claude 未接入` | 这台机器只有 `~/.claude` 的 skills/plugins 和 1 kB 的 `.claude.json`（无 `history`），**没有可读的历史**。别的机器上 `~/.claude/projects/<slug>/<uuid>.jsonl` 是明文，可直接接 |
-| **Qoder** | 不出现 | 未安装（`~/.qoder`、`%APPDATA%\Qoder`、注册表都没有） |
 
 Trae 有三条路，按「干净程度」排：
 
-1. **装 TRAE CLI（最干净）** —— CLI 2.0（`traex`）把会话写成 `~/.trae/cli/sessions/YYYY/MM/DD/rollout-*.jsonl`，**明文 jsonl**，和现有的 codex 解析器同构。本机没装 CLI，所以还没接；装了就能接。
-2. **让 Trae 自己导出** —— 社区 MCP 服务 [`mcp-session-saver`](https://www.npmjs.com/package/mcp-session-saver) 在 Trae 里说一句「保存当前会话」，就把对话按 IDE/日期落成 Markdown。插件再读那个目录即可，**零逆向**。
-3. **解密数据库** —— [`Oh-My-Trae/trae-db-decrypt`](https://github.com/Oh-My-Trae/trae-db-decrypt) 做的是进程发现 + 内存扫描拿密钥。能work，但要读进程内存、随 Trae 版本失效、风险自担，**不建议集进插件**。
+1. **装 TRAE CLI** —— CLI 2.0（`traex`）把会话写成 `~/.trae/cli/sessions/YYYY/MM/DD/rollout-*.jsonl`，**明文 jsonl**，与控制台现有解析器同构。**解析器已经写好**（`collectTraeCli`），装上 CLI 就会自动出现在列表里；本机没装，所以这条分支未经真机验证。
+2. **让 Trae 自己导出** —— 社区 MCP 服务 [`mcp-session-saver`](https://www.npmjs.com/package/mcp-session-saver) 在 Trae 里说一句「保存当前会话」，把对话按 IDE/日期落成 Markdown，再让看板读那个目录即可，**零逆向**。
+3. **解密数据库** —— [`Oh-My-Trae/trae-db-decrypt`](https://github.com/Oh-My-Trae/trae-db-decrypt) 做的是进程发现 + 内存扫描拿密钥。能work，但要读进程内存、随 Trae 版本失效、风险自担，**不集成进插件**。
 
 Trae 官方论坛也确认过这条边界：`database.db` 加密、暂不支持查看，界面只给 Markdown 导出（[1](https://forum.trae.cn/t/topic/52906)、[2](https://forum.trae.cn/t/topic/174212/4)）。
 

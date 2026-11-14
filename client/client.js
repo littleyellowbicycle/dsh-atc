@@ -704,9 +704,10 @@ window.__ModuleLoader__.load({
       const attention = board ? board.attention : 0
       const doneCount = board ? board.items.filter((item) => item.status === 'done').length : 0
       const failedCount = board ? board.items.filter((item) => item.status === 'failed').length : 0
-      const activeTools = board
-        ? (board.sources || []).filter((source) => source.available).length
-        : 0
+      // "Connected" means it yielded rows: an empty store is not a failure, and
+      // counting unreadable agents in the denominator would misread as broken.
+      const activeTools = board ? new Set(board.items.map((item) => item.tool)).size : 0
+      const unreadable = board ? (board.agents || []).filter((agent) => !agent.parsed).length : 0
       const totalTools = board ? (board.sources || []).length : 0
       const lastSeen = board && board.items.length ? board.items[0].lastActivity : 0
 
@@ -795,7 +796,13 @@ window.__ModuleLoader__.load({
                 h(Kpi, {
                   value: `${activeTools}/${totalTools}`,
                   label: '接入的 agent',
-                  note: activeTools === totalTools ? '全部可用' : `${totalTools - activeTools} 个不可用`,
+                  note: (() => {
+                    const empty = Math.max(0, totalTools - activeTools - unreadable)
+                    const parts = []
+                    if (empty > 0) parts.push(`${empty} 个无数据`)
+                    if (unreadable > 0) parts.push(`${unreadable} 个读不了`)
+                    return parts.length ? parts.join(' · ') : '全部可用'
+                  })(),
                 }),
               ),
 
@@ -1012,7 +1019,11 @@ window.__ModuleLoader__.load({
                   '全部 agent',
                   h('span', { className: 'fb-chip-count' }, String(filtered.length)),
                 ),
-                (board.sources || []).map((source) =>
+                // A source that is readable but holds nothing (an empty store)
+                // earns no chip: showing "claude 0" reads like a broken agent.
+                (board.sources || [])
+                  .filter((source) => source.available && (toolCounts.get(source.tool) || 0) > 0)
+                  .map((source) =>
                   h(
                     'button',
                     {
