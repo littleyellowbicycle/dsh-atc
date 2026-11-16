@@ -19,12 +19,35 @@ window.__ModuleLoader__.load({
 
     const PANEL_ID = 'atc'
     const ENDPOINT = '/dsh-atc/data'
+    const OPEN_ENDPOINT = '/dsh-atc/open'
     const POLL_MS = 5000
     const DAY = 86_400_000
 
     /* ---------------------------------------------------------------- store */
 
     const store = { data: null, error: null, at: 0, paused: false, listeners: new Set() }
+
+    /**
+     * Ask the host to open this row in its own tool.
+     *
+     * Resolves true only when a terminal was actually started; anything else
+     * (no opener for the tool, an unsupported platform, a bad id) resolves false
+     * so the caller can fall back to copying the path.
+     */
+    async function requestOpen(item) {
+      try {
+        const response = await fetch(OPEN_ENDPOINT, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ tool: item.tool, openId: item.openId, cwd: item.cwd }),
+        })
+        if (!response.ok) return false
+        const result = await response.json()
+        return result?.ok === true
+      } catch {
+        return false
+      }
+    }
 
     function publish(patch) {
       Object.assign(store, patch)
@@ -1030,7 +1053,7 @@ window.__ModuleLoader__.load({
     function SessionCard({ item, onOpen, onMenu, starred, onStar }) {
       const status = STATUS[item.status] || STATUS.idle
       const color = AGENT_COLOR[item.tool] || PALETTE.slate
-      const clickable = Boolean(item.sessionId)
+      const clickable = Boolean(item.sessionId || item.openLabel)
       const ctx = /ctx\s*(\d+)%/.exec(item.detail || '')
       const extra = item.detail
         ? item.detail.replace(/ctx\s*\d+%/, '').replace(/^[·\s]+|[·\s]+$/g, '')
@@ -1041,7 +1064,11 @@ window.__ModuleLoader__.load({
           className: `fb-session${clickable ? ' fb-session-clickable' : ''}`,
           role: clickable ? 'button' : undefined,
           tabIndex: clickable ? 0 : undefined,
-          title: clickable ? '打开这个会话 · 右键更多操作' : `${item.workspace}（不支持跳转）· 右键更多操作`,
+          title: item.sessionId
+            ? '打开这个会话 · 右键更多操作'
+            : item.openLabel
+              ? `${item.openLabel} · 右键更多操作`
+              : `${item.workspace}（点一下复制路径）· 右键更多操作`,
           onClick: () => onOpen(item),
           onContextMenu: (event) => {
             event.preventDefault()
@@ -1267,9 +1294,20 @@ function EmptyState({ board }) {
 
       const onOpen = useCallback(
         async (item) => {
+          // A DSH session opens inside the host, no terminal involved.
           if (item.sessionId) {
             if (openSession(ctx, item.sessionId)) return
             flash('宿主没有提供会话跳转接口')
+            return
+          }
+          // Tools with their own CLI get a terminal running the resume command.
+          if (item.openLabel && item.openId) {
+            if (await requestOpen(item)) {
+              flash(item.openLabel)
+              return
+            }
+            const copied = await copyText(item.workspace)
+            flash(copied ? `${item.tool} 打不开，已复制工作区路径` : `${item.tool} 打不开`)
             return
           }
           const copied = await copyText(item.workspace)
@@ -1330,7 +1368,7 @@ function EmptyState({ board }) {
           },
           { separator: true },
           {
-            label: item.sessionId ? '打开会话' : '复制工作区路径',
+            label: item.sessionId ? '打开会话' : item.openLabel || '复制工作区路径',
             icon: '↗',
             onSelect: () => onOpen(item),
           },

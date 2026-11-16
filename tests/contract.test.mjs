@@ -223,6 +223,34 @@ test('every state gets a mark of its own', async () => {
   }
 })
 
+test('planOpen decides what a click runs, and refuses anything it cannot run', async () => {
+  const { planOpen, openerLabels } = await import(pathToFileURL(join(root, 'lib', 'openers.mjs')).href)
+
+  const opencode = planOpen({ tool: 'opencode', openId: 'ses_e1cd4e6c8ffea', cwd: 'D:/work/proj' })
+  assert.equal(opencode.ok, true)
+  assert.equal(opencode.command, 'opencode')
+  assert.deepEqual([...opencode.args], ['-s', 'ses_e1cd4e6c8ffea'])
+  assert.equal(opencode.cwd, 'D:/work/proj', 'an absolute cwd is carried through')
+
+  const codex = planOpen({ tool: 'codex', openId: '01a132e3-d137-7e42-9ccb-3fccb69cedb8', cwd: 'C:\\work' })
+  assert.deepEqual([...codex.args], ['resume', '01a132e3-d137-7e42-9ccb-3fccb69cedb8'])
+
+  // A tool with no opener is a refusal, not a guess — the client then copies.
+  assert.equal(planOpen({ tool: 'workbuddy', openId: 'abc' }).reason, 'no-opener')
+  assert.equal(planOpen({ tool: 'dsh', openId: 'session-x' }).reason, 'no-opener')
+
+  // Ids reach a command line, so anything shell-shaped is refused outright.
+  for (const bad of ['', '  ', 'a b', 'x; rm -rf /', "a'b", '$(whoami)', 'a'.repeat(129)]) {
+    assert.equal(planOpen({ tool: 'opencode', openId: bad }).reason, 'bad-id', 'refused: ' + bad)
+  }
+
+  // A relative cwd is dropped rather than passed to the terminal.
+  assert.equal(planOpen({ tool: 'opencode', openId: 'abc', cwd: 'relative/dir' }).cwd, undefined)
+
+  // Only tools with a real opener are advertised to the UI.
+  assert.deepEqual(Object.keys(openerLabels()).sort(), ['codex', 'opencode'])
+})
+
 test('readSqliteSource reports rows, the store total, and its own failures', async () => {
   const { mkdtempSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
