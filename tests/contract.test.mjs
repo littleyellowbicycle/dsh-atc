@@ -223,6 +223,56 @@ test('every state gets a mark of its own', async () => {
   }
 })
 
+test('resolveTitle picks the same source the collectors used to pick by hand', async () => {
+  const { resolveTitle, isPlaceholderTitle, toMs } = await import(
+    pathToFileURL(join(root, 'lib', 'rules.mjs')).href
+  )
+
+  // A store-supplied name wins when it is a name.
+  assert.equal(resolveTitle({ declared: 'Hosts 显存长测', fallback: 'abcd1234' }), 'Hosts 显存长测')
+  // A store that writes placeholders loses to the first prompt.
+  assert.equal(
+    resolveTitle({
+      declared: 'New session - 2026-08-07T03:22:44.509Z',
+      prompt: '把接口文档同步到 wiki',
+      fallback: 'abcd1234',
+      distrustDeclared: true,
+    }),
+    '把接口文档同步到 wiki',
+  )
+  // With no prompt, even a placeholder beats "unknown" — that is what shipped.
+  assert.equal(
+    resolveTitle({
+      declared: 'New session - 2026-08-07T03:22:44.509Z',
+      fallback: 'abcd1234',
+      distrustDeclared: true,
+    }),
+    'New session - 2026-08-07T03:22:44.509Z',
+  )
+  // Without the flag, a placeholder-shaped name is still a name (unchanged for
+  // every other source).
+  assert.equal(
+    resolveTitle({ declared: 'New session - x', fallback: 'abcd1234' }),
+    'New session - x',
+  )
+  // Nothing declared: the prompt, then the fallback.
+  assert.equal(resolveTitle({ prompt: '第一句话', fallback: 'abcd1234' }), '第一句话')
+  assert.equal(resolveTitle({ declared: '   ', fallback: 'abcd1234' }), 'abcd1234')
+
+  assert.equal(isPlaceholderTitle(''), true)
+  assert.equal(isPlaceholderTitle('New session - 2026-01-01'), true)
+  // Only opencode's actual placeholder shape counts; a real name that merely
+  // starts with the same letters must survive.
+  assert.equal(isPlaceholderTitle('New sessions summary'), false)
+  assert.equal(isPlaceholderTitle('未命名 · ab12'), false)
+
+  // Seconds and milliseconds both land in epoch-ms; that guess is why stores do
+  // not need a per-source unit rule.
+  assert.equal(toMs(1794624896), 1794624896000)
+  assert.equal(toMs(1794624896000), 1794624896000)
+  assert.equal(toMs(null), 0)
+})
+
 test('a filter chip releases itself when picked twice', () => {
   const definition = loadClient()
   const { toggleFilter } = definition.__test
