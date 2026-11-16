@@ -223,6 +223,38 @@ test('every state gets a mark of its own', async () => {
   }
 })
 
+test('a running card says what the session is doing', async () => {
+  const { callTarget, summarizeCall, doingLine } = await import(
+    pathToFileURL(join(root, 'lib', 'tool-calls.mjs')).href
+  )
+
+  // The agent writes a human sentence for the tool when it can; that beats the
+  // command line, which is what a person would have to parse.
+  assert.equal(
+    callTarget(JSON.stringify({ command: 'cd D:\\x; node y.mjs', description: '量一下开销' })),
+    '量一下开销',
+  )
+  // Without a description, the file it is touching is the useful part.
+  assert.equal(callTarget(JSON.stringify({ file_path: 'D:/p/a.ts', content: 'x' })), 'D:/p/a.ts')
+  assert.equal(callTarget('{"command":"npm test"}'), 'npm test')
+  // Nothing usable: empty, so the caller shows the tool name alone.
+  assert.equal(callTarget('{}'), '')
+  assert.equal(callTarget('not json'), '')
+  // Bounded: a pasted blob must not become the card's subtitle.
+  assert.ok(callTarget(JSON.stringify({ command: 'x'.repeat(400) })).length <= 121)
+
+  const call = summarizeCall({
+    type: 'tool/call',
+    time: 1794817409874,
+    data: { name: 'pwsh', arguments: JSON.stringify({ description: '跑个探测' }) },
+  })
+  assert.equal(call.name, 'pwsh')
+  assert.equal(call.target, '跑个探测')
+  assert.equal(doingLine(call), 'pwsh · 跑个探测')
+  assert.equal(doingLine({ name: 'present', target: '' }), 'present', 'name alone when there is no target')
+  assert.equal(summarizeCall({ type: 'turn/start' }), null, 'only tool calls summarise')
+})
+
 test('focus matchers name real tools and exclude browsers', async () => {
   const { WINDOW_MATCHERS, focusableTools } = await import(pathToFileURL(join(root, 'lib', 'focus.mjs')).href)
 

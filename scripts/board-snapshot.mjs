@@ -32,6 +32,7 @@ const snapshot = {
     workspace: item.workspace,
     status: item.status,
     detail: item.detail ?? '',
+    doing: item.doing ?? '',
     lastActivity: item.lastActivity,
     sessionId: item.sessionId ?? '',
   })),

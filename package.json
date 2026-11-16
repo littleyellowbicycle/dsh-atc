@@ -1,6 +1,6 @@
 {
   "name": "dsh-atc",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "description": "Agent 空管中心 for DeepSeek Harness: one sidebar panel listing every local agent session (DSH, codex, opencode, WorkBuddy, Gemini) with attention-first grouping and folded history — zero token, host-side inference.",
   "type": "module",
   "main": "./lib/index.js",

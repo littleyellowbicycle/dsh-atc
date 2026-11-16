@@ -1143,7 +1143,9 @@ window.__ModuleLoader__.load({
               })()
             : extra
               ? h('span', { className: 'fb-session-detail' }, extra)
-              : null,
+              : item.doing
+                ? h('span', { className: 'fb-session-doing', title: item.doing }, `⧗ ${item.doing}`)
+                : null,
         ),
       )
     }
@@ -2111,6 +2113,9 @@ function EmptyState({ board }) {
 .fb-session-foot{margin-top:auto;padding-top:9px;border-top:1px solid var(--fb-line-soft);display:flex;align-items:center;gap:10px}
 .fb-session-ctx{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--fb-text-3);font-variant-numeric:tabular-nums}
 .fb-session-detail{margin-left:auto;font-size:10.5px;color:var(--fb-text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:52%}
+/* What a running session is doing right now, in the space the ctx meter uses
+   on other sources. It changes as the agent works, which is the point. */
+.fb-session-doing{margin-left:auto;min-width:0;font-size:10.5px;color:var(--fb-text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:64%;font-variant-numeric:tabular-nums}
 .fb-meter{width:52px;height:4px;border-radius:999px;background:var(--fb-line-soft);overflow:hidden;flex:none;display:inline-block}
 .fb-meter i{display:block;height:100%;border-radius:999px;background:#d98324}
 .fb-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 9px;border-radius:999px;white-space:nowrap}
