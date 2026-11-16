@@ -1962,7 +1962,30 @@ function EmptyState({ board }) {
 .fb-kpi-value{font-size:22px;font-weight:650;line-height:1.15;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 .fb-kpi-label{margin-top:3px;font-size:11.5px;color:var(--fb-text-2)}
 .fb-kpi-note{margin-top:1px;font-size:10.5px;color:var(--fb-text-4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.fb-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:12px;margin-bottom:12px}
+/* Always one row: the two charts share the width instead of stacking. They
+   shrink by stepping their internals down (heat cells, name column) rather than
+   by moving to separate lines — a dashboard that reflows into a column loses
+   the at-a-glance comparison it exists for. */
+.fb-charts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-bottom:12px}
+.fb-charts>.fb-card{min-width:0}
+@media (max-width:980px){
+.fb-charts{gap:10px}
+.fb-heat-cell{width:12px;height:12px}
+.fb-agent-bar-name{width:62px}
+.fb-card{padding:12px}
+}
+@media (max-width:840px){
+.fb-heat-cell{width:10px;height:10px}
+.fb-heat-grid{gap:3px}
+.fb-heat{gap:4px}
+.fb-agent-bar-name{width:52px}
+.fb-agent-bar-pct{display:none}
+}
+@media (max-width:720px){
+.fb-heat-cell{width:8px;height:8px}
+.fb-agent-bar{gap:6px}
+.fb-agent-bar-name{width:44px;font-size:11px}
+}
 .fb-card{border:1px solid var(--fb-line);border-radius:var(--fb-r-md);background:var(--fb-surface);padding:14px 16px}
 .fb-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
 .fb-card-title{font-size:13px;font-weight:600}
