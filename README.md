@@ -90,7 +90,8 @@ Agent 空管中心  [本地推断·零 token]      更新于 11:02   [今天|近
 ```
 
 每个会话是一张卡片：标题 + 相对时间、日期、agent / 工作区标签、状态药丸、上下文占用条。
-右键卡片有菜单：从看板移除 / 标星 / 打开会话 / 复制标题。
+右上角有 **ⓘ（详情抽屉）** 和 **☆（标星）**，都在 hover 时浮现；右键有菜单：从看板移除 / 查看详情 / 标星 / 打开。
+在跑的 DSH 卡还会在底部写它在做什么——见下一节。
 
 两处刻意的口径：
 
@@ -264,7 +265,7 @@ turn/end.reason.kind → completed / error / aborted / approval / …
 | 方向 | 要做什么 | 代价 |
 |---|---|---|
 | **更多工具的直开** | opencode 和 codex 现在能在原会话上续接（点卡片开终端）。其余工具缺的是同一件事：一条**核实过**的「按 id 打开」入口。WorkBuddy 是桌面应用，要查它有没有 deep link；gemini / zcode / claude 的 resume 参数没有在本机验证过，不猜 | 小，逐家验 |
-| **卡片详情抽屉** | 点开看最近几条消息、tool 调用、耗时。前置是 `tool/call` 事件解析——那同时也是「在跑卡显示正在干什么」的前提，一次做完两件事 | 大 |
+| **更多来源能进抽屉** | 抽屉现在只对 DSH 有内容（只有它记录工具调用）。其它源要么显示最近消息，要么维持“该源不记录调用记录”的说法——前者需要给 opencode / minimax 各写一段消息读取，代码不多，但它们的“调用”概念和 DSH 不同，不假装一样 | 中 |
 | **把标题与详情的决定也收进 spec** | 四个 sqlite 采集器已经共用 `readSqliteSource`（见下），但它们的**查询和行映射**仍是各自写的——每家的 join、子查询、侧表都不同。真正能再收的是「标题取哪一列、详情拼什么」，需要 spec 支持 `titleFallback` / `detail` 这类字段 | 中 |
 | **接入扫描到的候选** | 本机扫描已经能识别 AionUi、GitKrakenCLI 这类「有会话表但没 spec」的库，缺的只是一行 spec | 小 |
 
@@ -335,7 +336,7 @@ dsh plugin add dsh-atc
 装指定版本：
 
 ```powershell
-dsh plugin add dsh-atc@0.16.0
+dsh plugin add dsh-atc@<版本>   # 版本号看 npm view dsh-atc version
 ```
 
 ### 从 GitHub（npm 不可用时）
