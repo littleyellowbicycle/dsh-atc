@@ -22,6 +22,20 @@ dsh plugin add dsh-atc
 
 同时用 DSH / codex / opencode / WorkBuddy / Trae / MiniMax 时，注意力会被切成 N 份。这个插件把「谁在跑、谁停了、谁在等我」压到一屏。
 
+## 只读，且路由有宿主同级的准入检查
+
+插件读的全部是本地会话存储，SQLite 一律 `readOnly` 打开，不写任何 agent 的数据，不联网（除同源自己的那条路由），也不调用模型。
+
+那条路由 `/dsh-atc/data` 在 handler 入口先过宿主的准入检查：
+
+```js
+connection.requestRejection(request)   // Host/Origin 围栏 + 要求已认证的 live Peer
+```
+
+不通过就 403。没有这道检查时，浏览器里任意一个网页都能通过 `http://127.0.0.1:<端口>` 读到本机所有会话的标题和工作区（DNS rebinding / localhost CSRF）——而这个面板恰恰把「谁在干什么」全列出来了。
+
+> 这条是市场维护者合并 PR 时提出的，原始描述里被写进了「HTTP 路由没有 DSH 的访问检查」。
+
 ## 数据源
 
 | 工具 | 存储 | 读取方式 |
