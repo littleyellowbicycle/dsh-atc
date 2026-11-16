@@ -223,6 +223,72 @@ test('every state gets a mark of its own', async () => {
   }
 })
 
+test('readSqliteSource reports rows, the store total, and its own failures', async () => {
+  const { mkdtempSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join: joinPath } = await import('node:path')
+  const { DatabaseSync } = await import('node:sqlite')
+  const { readSqliteSource } = await import(pathToFileURL(join(root, 'lib', 'capabilities.mjs')).href)
+
+  const dir = mkdtempSync(joinPath(tmpdir(), 'atc-cap-'))
+  const store = joinPath(dir, 'store.db')
+  const db = new DatabaseSync(store)
+  db.exec('CREATE TABLE items (id TEXT, title TEXT, updated INTEGER)')
+  const insert = db.prepare('INSERT INTO items VALUES (?, ?, ?)')
+  for (let i = 0; i < 5; i += 1) insert.run('id' + i, 'title' + i, 1000 + i)
+  db.close()
+
+  const seen = []
+  const result = await readSqliteSource({
+    tool: 'demo',
+    now: 42,
+    conf: { perSource: 3 },
+    candidates: [joinPath(dir, 'missing.db'), store],
+    missing: 'no store',
+    countSql: 'SELECT COUNT(*) AS n FROM items',
+    rowSql: 'SELECT id, title, updated FROM items ORDER BY updated DESC LIMIT ?',
+    map: (row, ctx) => {
+      seen.push(ctx.now)
+      return { tool: 'demo', title: row.title, lastActivity: row.updated, key: row.id }
+    },
+  })
+
+  assert.equal(result.available, true)
+  assert.equal(result.count, 5, 'count is the store total, not the page size')
+  assert.equal(result.items.length, 3, 'rowSql honours perSource')
+  assert.equal(seen.length, 3)
+  assert.equal(seen[0], 42, 'the mapper receives now')
+  assert.equal(result.items[0].key, 'id4', 'newest first')
+
+  // No candidate on disk: one unavailable source, not a throw.
+  const absent = await readSqliteSource({
+    tool: 'demo',
+    now: 0,
+    conf: { perSource: 3 },
+    candidates: [joinPath(dir, 'nothing.db')],
+    missing: 'no store',
+    countSql: 'SELECT COUNT(*) AS n FROM items',
+    rowSql: 'SELECT * FROM items LIMIT ?',
+    map: () => ({}),
+  })
+  assert.equal(absent.available, false)
+  assert.equal(absent.reason, 'no store')
+
+  // A broken query degrades the source instead of failing the board.
+  const broken = await readSqliteSource({
+    tool: 'demo',
+    now: 0,
+    conf: { perSource: 3 },
+    candidates: [store],
+    missing: 'no store',
+    countSql: 'SELECT COUNT(*) AS n FROM items',
+    rowSql: 'SELECT * FROM nope LIMIT ?',
+    map: () => ({}),
+  })
+  assert.equal(broken.available, false)
+  assert.ok(/nope/.test(String(broken.reason)), 'the reason names the failing query')
+})
+
 test('resolveTitle picks the same source the collectors used to pick by hand', async () => {
   const { resolveTitle, isPlaceholderTitle, toMs } = await import(
     pathToFileURL(join(root, 'lib', 'rules.mjs')).href

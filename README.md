@@ -231,8 +231,28 @@ turn/end.reason.kind → completed / error / aborted / approval / …
 |---|---|---|
 | **点卡片直接跳到对应工具** | 现在只有 DSH 行能跳（`uiWorkspace.openSession`），其它 agent 点击是复制工作区路径。目标是每张卡片都落到「那个工具里的这条会话」，例如 opencode 用 `opencode --session <id>`、WorkBuddy 走它的 deep link。缺的是各家「打开某会话」的入口，要逐个确认能不能从外部唤起 | 中 |
 | **卡片详情抽屉** | 点开看最近几条消息、tool 调用、耗时。前置是 `tool/call` 事件解析——那同时也是「在跑卡显示正在干什么」的前提，一次做完两件事 | 大 |
-| **spec 引擎取代手写 collector** | sqlite 系仍是四个手写采集器，`lib/sources.mjs` 目前只用于匹配。改成走 `lib/generic.mjs` 的通用查询，能删掉约 150 行重复代码 | 中 |
+| **把标题与详情的决定也收进 spec** | 四个 sqlite 采集器已经共用 `readSqliteSource`（见下），但它们的**查询和行映射**仍是各自写的——每家的 join、子查询、侧表都不同。真正能再收的是「标题取哪一列、详情拼什么」，需要 spec 支持 `titleFallback` / `detail` 这类字段 | 中 |
 | **接入扫描到的候选** | 本机扫描已经能识别 AionUi、GitKrakenCLI 这类「有会话表但没 spec」的库，缺的只是一行 spec | 小 |
+
+## 采集器怎么分层
+
+三层，各自只负责一件事：
+
+```text
+能力（lib/capabilities.mjs）   拿到记录：读 SQLite、查行、数总数、失败降级
+形状（lib/sources.mjs）        判断是不是会话库：表名 + 关键列 → 供发现扫描用
+规则（lib/rules.mjs）          决定一行说什么：标题取谁、时间戳怎么归一
+```
+
+四个 SQLite 采集器（opencode / WorkBuddy / ZCode / MiniMax）现在都走 `readSqliteSource`：
+它们只声明**路径、两条 SQL、行映射**，文件检查 / 打开 / 计数 / 关闭 / 降级这一圈样板由能力负责。
+
+**刻意没做的事**：把 SQL 本身改成声明式 spec。四家的 join、子查询、侧表、过滤条件互不相同，
+要表达它们就得造一个只有四个调用方的查询构造器，比四段可读的 SQL 更糟。
+`lib/sources.mjs` 保持"判断可读性"这一个用途，才站得住。
+
+`npm run board-snapshot <out.json>` 是配合重构用的：把看板导成快照，
+改完再导一次逐行对比，能证明"行为没变"而不是"我觉得没变"。
 
 ## 开发与发布工具
 
