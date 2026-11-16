@@ -223,6 +223,77 @@ test('every state gets a mark of its own', async () => {
   }
 })
 
+test('the detail drawer pairs calls with results across frames', async () => {
+  const { mkdtempSync, writeFileSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join: joinPath } = await import('node:path')
+  const { zstdCompressSync } = await import('node:zlib')
+  const { readDshDetail } = await import(pathToFileURL(join(root, 'lib', 'detail.mjs')).href)
+
+  // A log is a run of independent frames, and a call and its result land in
+  // different ones — that is the case the reader has to survive.
+  const frame = (events) => zstdCompressSync(Buffer.from(events.map((e) => JSON.stringify(e)).join('\n') + '\n'))
+  const log = Buffer.concat([
+    frame([
+      { type: 'session/title', time: 1000, data: { title: 'x' } },
+      {
+        type: 'tool/call',
+        time: 2000,
+        data: { callId: 'c1', name: 'pwsh', arguments: JSON.stringify({ description: '跑个探测' }) },
+      },
+    ]),
+    frame([
+      {
+        type: 'tool/result',
+        time: 2450,
+        data: {
+          toolCallId: 'c1',
+          message: { source: { kind: 'tool', callId: 'c1' }, content: [{ type: 'text', text: 'ok' }] },
+        },
+      },
+      {
+        type: 'assistant/message',
+        time: 2500,
+        data: { message: { role: 'assistant' }, usage: { inputTokens: 10, outputTokens: 20, totalTokens: 30 } },
+      },
+    ]),
+    frame([
+      {
+        type: 'tool/call',
+        time: 3000,
+        data: { callId: 'c2', name: 'present', arguments: JSON.stringify({ path: 'D:/a.png' }) },
+      },
+      { type: 'turn/end', time: 3100, data: { reason: { kind: 'completed' } } },
+    ]),
+  ])
+
+  const dir = mkdtempSync(joinPath(tmpdir(), 'atc-detail-'))
+  const file = joinPath(dir, 'session.v4.jsonl.zstd')
+  writeFileSync(file, log)
+
+  const detail = readDshDetail(file)
+  assert.equal(detail.supported, true)
+  assert.equal(detail.calls.length, 2)
+  assert.equal(detail.totalCalls, 2)
+
+  // Newest first.
+  assert.equal(detail.calls[0].callId, 'c2')
+  assert.equal(detail.calls[0].target, 'D:/a.png')
+  assert.equal(detail.calls[0].finished, false, 'no result yet — still running')
+  assert.equal(detail.calls[0].durationMs, null)
+
+  const paired = detail.calls[1]
+  assert.equal(paired.callId, 'c1')
+  assert.equal(paired.target, '跑个探测')
+  assert.equal(paired.finished, true)
+  assert.equal(paired.durationMs, 450, 'duration is result time minus call time')
+  assert.equal(paired.snippet, 'ok')
+
+  assert.equal(detail.usage.totalTokens, 30)
+  assert.equal(detail.usage.inputTokens, 10)
+  assert.equal(detail.lastTurn.reason, 'completed')
+})
+
 test('a running card says what the session is doing', async () => {
   const { callTarget, summarizeCall, doingLine } = await import(
     pathToFileURL(join(root, 'lib', 'tool-calls.mjs')).href

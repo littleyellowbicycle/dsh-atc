@@ -20,6 +20,7 @@ window.__ModuleLoader__.load({
     const PANEL_ID = 'atc'
     const ENDPOINT = '/dsh-atc/data'
     const OPEN_ENDPOINT = '/dsh-atc/open'
+    const DETAIL_ENDPOINT = '/dsh-atc/detail'
     const POLL_MS = 5000
     const DAY = 86_400_000
 
@@ -1050,7 +1051,7 @@ window.__ModuleLoader__.load({
      * Session card: title + relative time on top, agent / workspace tags in
      * the middle, status and context pressure on the footer.
      */
-    function SessionCard({ item, onOpen, onMenu, starred, onStar }) {
+    function SessionCard({ item, onOpen, onMenu, onDetail, starred, onStar }) {
       const status = STATUS[item.status] || STATUS.idle
       const color = AGENT_COLOR[item.tool] || PALETTE.slate
       const clickable = Boolean(item.sessionId || item.openLabel)
@@ -1085,6 +1086,20 @@ window.__ModuleLoader__.load({
           'div',
           { className: 'fb-session-top' },
           h('div', { className: 'fb-session-title' }, item.title),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'fb-detail-btn',
+              title: '查看详情',
+              onClick: (event) => {
+                event.stopPropagation()
+                onDetail(item)
+              },
+              onKeyDown: (event) => event.stopPropagation(),
+            },
+            'ⓘ',
+          ),
           h(
             'button',
             {
@@ -1151,7 +1166,7 @@ window.__ModuleLoader__.load({
     }
 
     /** Collapsible band of sessions. */
-    function Group({ title, items, color, defaultOpen, onOpen, onMenu, starSet, onStar, hint, recentMs }) {
+    function Group({ title, items, color, defaultOpen, onOpen, onMenu, onDetail, starSet, onStar, hint, recentMs }) {
       const [open, setOpen] = useState(defaultOpen)
       // Opening a band of 137 rows is not readable; start with the recent ones
       // and let the reader ask for the rest rather than dumping history.
@@ -1195,7 +1210,7 @@ window.__ModuleLoader__.load({
           ? h(
               'div',
               { className: 'fb-session-grid' },
-              shown.map((item) => h(SessionCard, { key: `${item.tool}:${item.key}`, item, onOpen, onMenu, starred: Boolean(starSet && starSet.has(itemKey(item))), onStar })),
+              shown.map((item) => h(SessionCard, { key: `${item.tool}:${item.key}`, item, onOpen, onMenu, onDetail, starred: Boolean(starSet && starSet.has(itemKey(item))), onStar })),
             )
           : null,
         withheld > 0
@@ -1248,6 +1263,109 @@ function EmptyState({ board }) {
   )
 }
 
+    /**
+     * What a session has been doing, turn by turn.
+     *
+     * Slides over the right of the board rather than replacing it: the list is the
+     * context for the detail, and losing it on every click is a reason dashboards
+     * get abandoned. Only DSH records tool calls, so other sources say so instead
+     * of showing an empty timeline that reads like "nothing happened".
+     */
+    function DetailDrawer({ state, onClose }) {
+      const item = state.item
+      const data = state.data
+      useEffect(() => {
+        const onKey = (event) => {
+          if (event.key === 'Escape') onClose()
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+      }, [onClose])
+
+      const calls = data?.calls ?? []
+      const duration = (value) => (value === null || value === undefined ? '—' : `${value} ms`)
+
+      return h(
+        'div',
+        { className: 'fb-drawer-wrap', onClick: onClose },
+        h(
+          'aside',
+          {
+            className: 'fb-drawer',
+            role: 'dialog',
+            'aria-label': '会话详情',
+            onClick: (event) => event.stopPropagation(),
+          },
+          h(
+            'div',
+            { className: 'fb-drawer-head' },
+            h(
+              'div',
+              { className: 'fb-drawer-heading' },
+              h('div', { className: 'fb-drawer-title', title: item.title }, item.title),
+              h('div', { className: 'fb-drawer-sub' }, `${item.tool} · ${item.workspace}`),
+            ),
+            h(
+              'button',
+              { type: 'button', className: 'fb-drawer-close', onClick: onClose, title: '关闭（Esc）' },
+              '✕',
+            ),
+          ),
+
+          state.loading ? h('div', { className: 'fb-drawer-note' }, '读取中…') : null,
+          state.error ? h('div', { className: 'fb-drawer-note' }, `读取失败：${state.error}`) : null,
+          data && data.supported === false
+            ? h('div', { className: 'fb-drawer-note' }, data.reason ?? '该工具不提供调用记录')
+            : null,
+
+          data && data.supported
+            ? h(
+                'div',
+                { className: 'fb-drawer-body' },
+                h(
+                  'div',
+                  { className: 'fb-drawer-stats' },
+                  h('span', null, `${data.totalCalls} 次调用`),
+                  data.lastTurn
+                    ? h('span', null, `最后一轮 ${data.lastTurn.reason || '结束'}`)
+                    : null,
+                  data.usage
+                    ? h('span', { title: '最近一步的 token 用量' }, `本轮 ${data.usage.totalTokens} token`)
+                    : null,
+                ),
+                calls.length === 0
+                  ? h('div', { className: 'fb-drawer-note' }, '日志里还没有工具调用')
+                  : h(
+                      'ol',
+                      { className: 'fb-calls' },
+                      calls.map((call) =>
+                        h(
+                          'li',
+                          { className: 'fb-call', key: call.callId },
+                          h(
+                            'div',
+                            { className: 'fb-call-row' },
+                            h('span', { className: 'fb-call-name' }, call.name),
+                            h('span', { className: 'fb-call-target', title: call.target }, call.target || '—'),
+                            h(
+                              'span',
+                              {
+                                className: `fb-call-dur${call.finished ? '' : ' fb-call-live'}`,
+                              },
+                              call.finished ? duration(call.durationMs) : '进行中',
+                            ),
+                          ),
+                          call.snippet ? h('div', { className: 'fb-call-snippet' }, call.snippet) : null,
+                        ),
+                      ),
+                    ),
+              )
+            : null,
+        ),
+      )
+    }
+
+
 /** Loading placeholder that mirrors the KPI grid shape. */
     function Skeleton() {
       return h(
@@ -1279,6 +1397,8 @@ function EmptyState({ board }) {
       // Rows removed from the board. Display-only: nothing on disk is touched.
       const [hidden, setHidden] = useState(() => loadHidden())
       const [menu, setMenu] = useState(null)
+      // `{ item, loading, data }` while the drawer is open, null when closed.
+      const [detail, setDetail] = useState(null)
       const [starred, setStarred] = useState(() => loadStarred())
       const [agentScope, setAgentScope] = useState('d1')
       const board = state.data
@@ -1316,6 +1436,29 @@ function EmptyState({ board }) {
           flash(copied ? `已复制工作区路径：${item.workspace}` : `工作区：${item.workspace}`)
         },
         [ctx, flash],
+      )
+
+      const openDetail = useCallback(
+        async (item) => {
+          setDetail({ item, loading: true, data: null })
+          try {
+            const query = new URLSearchParams({ tool: item.tool, id: item.key })
+            const response = await fetch(`${DETAIL_ENDPOINT}?${query}`)
+            const data = await response.json()
+            // A response for another card must not overwrite this one: the
+            // drawer can be reopened before the first fetch lands.
+            setDetail((current) =>
+              current && current.item.key === item.key ? { item, loading: false, data } : current,
+            )
+          } catch (error) {
+            setDetail((current) =>
+              current && current.item.key === item.key
+                ? { item, loading: false, error: String(error?.message ?? error) }
+                : current,
+            )
+          }
+        },
+        [],
       )
 
       const hideItem = useCallback(
@@ -1364,6 +1507,11 @@ function EmptyState({ board }) {
             onSelect: () => hideItem(item),
           },
           {
+            label: '查看详情',
+            icon: 'ⓘ',
+            onSelect: () => openDetail(item),
+          },
+          {
             label: starred.has(itemKey(item)) ? '取消标星' : '标星并置顶',
             icon: '★',
             onSelect: () => toggleStar(item),
@@ -1393,7 +1541,7 @@ function EmptyState({ board }) {
               ]
             : []),
         ]
-      }, [menu, hidden, starred, hideItem, restoreHidden, toggleStar, onOpen, flash])
+      }, [menu, hidden, starred, hideItem, restoreHidden, toggleStar, openDetail, onOpen, flash])
 
       const filters = { query, range, status: statusFilter, tool: toolFilter }
       const filtered = useMemo(() => {
@@ -1548,6 +1696,7 @@ function EmptyState({ board }) {
         ),
 
         menu ? h(ContextMenu, { at: { x: menu.x, y: menu.y }, items: menuItems, onClose: () => setMenu(null) }) : null,
+        detail ? h(DetailDrawer, { state: detail, onClose: () => setDetail(null) }) : null,
 
         state.error && !board
           ? h('div', { className: 'fb-error' }, `读取失败：${state.error}`)
@@ -1889,6 +2038,7 @@ function EmptyState({ board }) {
                 defaultOpen: true,
                 onOpen,
                 onMenu: openMenu,
+                onDetail: openDetail,
                 starSet: starred,
                 onStar: toggleStar,
                 hint: '你标过的',
@@ -1899,6 +2049,7 @@ function EmptyState({ board }) {
                 color: STATUS['needs-you'].color,
                 defaultOpen: true,
                 onMenu: openMenu,
+                onDetail: openDetail,
                 starSet: starred,
                 onStar: toggleStar,
                 onOpen,
@@ -1909,6 +2060,7 @@ function EmptyState({ board }) {
                 color: STATUS.running.color,
                 defaultOpen: true,
                 onMenu: openMenu,
+                onDetail: openDetail,
                 starSet: starred,
                 onStar: toggleStar,
                 onOpen,
@@ -1919,6 +2071,7 @@ function EmptyState({ board }) {
                 color: STATUS.done.color,
                 defaultOpen: false,
                 onMenu: openMenu,
+                onDetail: openDetail,
                 starSet: starred,
                 onStar: toggleStar,
                 onOpen,
@@ -1930,6 +2083,7 @@ function EmptyState({ board }) {
                 color: STATUS.recent.color,
                 defaultOpen: true,
                 onMenu: openMenu,
+                onDetail: openDetail,
                 starSet: starred,
                 onStar: toggleStar,
                 onOpen,
@@ -1941,6 +2095,7 @@ function EmptyState({ board }) {
                 color: STATUS.idle.color,
                 defaultOpen: false,
                 onMenu: openMenu,
+                onDetail: openDetail,
                 starSet: starred,
                 onStar: toggleStar,
                 onOpen,
@@ -2127,6 +2282,32 @@ function EmptyState({ board }) {
 /* The tail of a long band: one quiet row instead of a wall of history. */
 .fb-more{display:block;width:100%;margin-top:8px;padding:9px;border:1px dashed var(--fb-line);border-radius:var(--fb-r-sm);background:none;color:var(--fb-text-3);font-size:11.5px;cursor:pointer;font-family:inherit}
 .fb-more:hover{background:var(--fb-fill);color:var(--fb-text-2)}
+/* Detail drawer: overlays the right of the board so the list stays readable. */
+.fb-drawer-wrap{position:fixed;inset:0;z-index:70;background:rgba(15,23,42,.18);display:flex;justify-content:flex-end}
+.fb-drawer{width:min(420px,86vw);height:100%;background:var(--fb-surface);border-left:1px solid var(--fb-line);box-shadow:-14px 0 40px rgba(15,23,42,.18);display:flex;flex-direction:column;overflow:hidden}
+.fb-drawer-head{display:flex;align-items:flex-start;gap:10px;padding:14px 16px;border-bottom:1px solid var(--fb-line-soft)}
+.fb-drawer-heading{min-width:0;flex:1}
+.fb-drawer-title{font-size:13px;font-weight:600;color:var(--fb-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fb-drawer-sub{margin-top:3px;font-size:11px;color:var(--fb-text-4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fb-drawer-close{border:0;background:none;color:var(--fb-text-4);font-size:13px;cursor:pointer;padding:2px 4px;font-family:inherit;line-height:1}
+.fb-drawer-close:hover{color:var(--fb-text)}
+.fb-drawer-note{padding:14px 16px;font-size:12px;color:var(--fb-text-3);line-height:1.6}
+.fb-drawer-body{flex:1;overflow-y:auto;padding:12px 16px 20px}
+.fb-drawer-stats{display:flex;flex-wrap:wrap;gap:10px;font-size:10.5px;color:var(--fb-text-4);margin-bottom:10px}
+.fb-calls{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.fb-call{padding:7px 8px;border-radius:var(--fb-r-xs);border:1px solid transparent}
+.fb-call:hover{background:var(--fb-fill);border-color:var(--fb-line-soft)}
+.fb-call-row{display:flex;align-items:baseline;gap:8px;font-size:11.5px}
+.fb-call-name{font-weight:600;color:var(--fb-text-2);flex:none}
+.fb-call-target{flex:1;min-width:0;color:var(--fb-text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fb-call-dur{flex:none;color:var(--fb-text-4);font-variant-numeric:tabular-nums;font-size:10.5px}
+.fb-call-live{color:var(--dsw-alias-state-success-primary,#2f9e6f)}
+.fb-call-snippet{margin-top:4px;font-size:10.5px;color:var(--fb-text-4);line-height:1.5;max-height:2.9em;overflow:hidden;word-break:break-all}
+/* The detail button sits beside the star and shares its hover reveal. */
+.fb-detail-btn{border:0;background:none;padding:0 2px;font-size:11px;line-height:1;color:var(--fb-text-4);cursor:pointer;opacity:0;transition:opacity .12s ease,color .12s ease;font-family:inherit}
+.fb-session:hover .fb-detail-btn,.fb-session-clickable:hover .fb-detail-btn{opacity:1}
+.fb-detail-btn:hover{color:var(--fb-text)}
+
 /* Right-click menu: floats above the board, clamped to the viewport. */
 .fb-menu{position:fixed;z-index:60;padding:6px;background:var(--fb-surface);border:1px solid var(--fb-line);border-radius:var(--fb-r-sm);box-shadow:0 12px 32px rgba(15,23,42,.18);display:flex;flex-direction:column;gap:1px}
 .fb-menu-item{display:flex;align-items:center;gap:8px;width:100%;padding:7px 9px;border:0;border-radius:var(--fb-r-xs);background:none;color:var(--fb-text);font-size:12px;text-align:left;cursor:pointer;font-family:inherit}

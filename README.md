@@ -288,6 +288,27 @@ turn/end.reason.kind → completed / error / aborted / approval / …
 `npm run board-snapshot <out.json>` 是配合重构用的：把看板导成快照，
 改完再导一次逐行对比，能证明"行为没变"而不是"我觉得没变"。
 
+## 详情抽屉
+
+卡片右上角的 `ⓘ`（或右键「查看详情」）从右侧滑出一个面板，不挡列表——列表本身就是这条详情的上下文。
+
+能看到的东西：
+
+| 内容 | 来源 |
+|---|---|
+| 最近 12 次工具调用 | `tool/call` 与 `tool/result` 按 `callId` 配对 |
+| 每次调用的耗时 | `result.time - call.time`；没有 result 就是「进行中」 |
+| 每次调用的目标 | 同卡片那行，取 `arguments.description` 优先 |
+| 结果摘要 | `tool/result` 的文本，截断到 240 字 |
+| 本轮 token | `assistant/message` 的 `usage`（注意它在 `data.usage`，不在 message 里） |
+
+**只有 DSH 有这些。** 其它源不记录工具调用，抽屉会直接说「该工具不记录工具调用」，而不是画一条空时间线让人以为什么都没发生。
+
+两句实现上的实话：
+
+- **按需读，不进轮询。** 打开抽屉才扫日志（一次约 10–25 ms，日志越大越多，最多 400 帧）。
+- **叫与结果常常落在不同的 zstd 帧里**，而扫描是从最新帧往回走的，所以结果会先于调用被看到。两者分别收进 Map、最后按 `callId` 配对——一边收一边配对的那版，每一行都显示「进行中」。
+
 ## 开发与发布工具
 
 都在 `scripts/` 下，都不需要起 DSH（除 `live-check`）：
