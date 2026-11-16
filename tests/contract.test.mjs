@@ -223,6 +223,30 @@ test('every state gets a mark of its own', async () => {
   }
 })
 
+test('focus matchers name real tools and exclude browsers', async () => {
+  const { WINDOW_MATCHERS, focusableTools } = await import(pathToFileURL(join(root, 'lib', 'focus.mjs')).href)
+
+  for (const tool of ['workbuddy', 'opencode', 'codex', 'zcode', 'trae']) {
+    assert.ok(WINDOW_MATCHERS[tool], `${tool} has a matcher`)
+    assert.ok(focusableTools().includes(tool))
+  }
+
+  // Every pattern must compile — a broken regex would throw inside PowerShell.
+  for (const [tool, criteria] of Object.entries(WINDOW_MATCHERS)) {
+    for (const key of ['title', 'proc']) {
+      if (criteria[key]) assert.doesNotThrow(() => new RegExp(criteria[key]), `${tool}.${key} compiles`)
+    }
+  }
+
+  // The CLI tools require a console host: a browser tab titled "OpenCode Console"
+  // must not win the match, which is what happened before the allowlist.
+  const hosts = new RegExp(WINDOW_MATCHERS.opencode.proc)
+  assert.equal(hosts.test('cmd'), true)
+  assert.equal(hosts.test('WindowsTerminal'), true)
+  assert.equal(hosts.test('msedge'), false)
+  assert.equal(hosts.test('chrome'), false)
+})
+
 test('planOpen decides what a click runs, and refuses anything it cannot run', async () => {
   const { planOpen, openerLabels } = await import(pathToFileURL(join(root, 'lib', 'openers.mjs')).href)
 

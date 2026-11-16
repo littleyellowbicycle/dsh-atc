@@ -124,11 +124,16 @@ Agent 空管中心  [本地推断·零 token]      更新于 11:02   [今天|近
 | 卡片 | 点一下 |
 |---|---|
 | **DSH** | 在宿主里切到那个会话（`uiWorkspace.openSession`） |
-| **opencode / codex** | 开一个终端，在那个会话上继续：`opencode -s <id>` / `codex resume <id>`，工作目录是这条会话原来的目录 |
-| **其它** | 复制工作区路径，方便去对应工具里找 |
+| **WorkBuddy / ZCode / Trae** | 把那个应用的窗口提到前台 |
+| **opencode / codex** | 先找它们的终端窗口提到前台；没有窗口才开一个新的续接会话（`opencode -s <id>` / `codex resume <id>`） |
+| **其它** | 复制工作区路径 |
 
-能直接打开的只有**命令已经核实支持「按 id 续接」**的工具（`lib/openers.mjs` 里一张表）。
-其余工具不是"以后再说"，是没验证过就不能声称——点一下弹个终端然后失败，比复制路径更糟。
+先找窗口、再开终端，这个顺序是有意的：那条会话可能正被另一个客户端占着，再起一个只会打架。
+
+窗口匹配（`lib/focus.mjs`）两件事值得知道：
+
+- CLI 工具要求窗口进程是**终端宿主**（cmd / conhost / WindowsTerminal / powershell / Code）。之前只按标题匹配，一个标题里带 "OpenCode Console" 的 Edge 标签页把焦点抢走了。
+- `SetForegroundWindow` 对"用户此刻没在交互的进程"是拒绝的，而点卡片正是这种情况。所以这里会依次尝试 attach 前台线程 → `SwitchToThisWindow` → 模拟一次 ALT 键，并且**每次都重新读前台窗口来确认**，不拿 `SetForegroundWindow` 的返回值当结果。
 
 安全上，这条路径只做了三件事：
 
