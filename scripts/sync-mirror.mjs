@@ -20,7 +20,7 @@
 
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -182,13 +182,50 @@ cd "$env:USERPROFILE\\.dsh\\profiles\\<profile>"
 
 ## 更新
 
-新版发布后由 \`dsh-atc\` 仓库的 \`scripts/sync-mirror.mjs\` 生成新目录，别覆盖旧目录（隔离区可能在不同时间拉取）。
+新版发布后由 \`dsh-atc\` 仓库的 \`scripts/sync-mirror.mjs\` 生成新目录，**并删掉上一版**——这里只保留最新一版；历史版本在 npm 与 GitHub Release 上仍可取。
 `
   if (dryRun) {
     say(`  would write ${join(dir, 'README.md')}`)
     return
   }
   writeFileSync(join(dir, 'README.md'), body)
+}
+
+/**
+ * Keep only the newest mirror.
+ *
+ * One directory per release does not scale: every version carried its own copy
+ * of the same screenshot, so five releases came to 3 MB of near-identical
+ * files. The mirror now holds the current version only — npm and GitHub keep
+ * the history, which is what "an old version" usually means anyway.
+ */
+function pruneOlderVersions(keep) {
+  const dir = join(syncRepo, 'packages')
+  if (existsSync(dir)) {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      if (!entry.name.startsWith(`${name}-`) || entry.name === keep) continue
+      if (dryRun) {
+        say(`  would prune packages/${entry.name}`)
+        continue
+      }
+      rmSync(join(dir, entry.name), { recursive: true, force: true })
+      say(`  pruned packages/${entry.name}`)
+    }
+  }
+
+  // Drop the index rows of versions that no longer exist.
+  const indexPath = join(syncRepo, 'README.md')
+  if (!existsSync(indexPath)) return
+  const index = readFileSync(indexPath, 'utf8')
+  const kept = index.split('\n').filter((line) => {
+    const match = /^\| \[`packages\/([^/]+)\/`\]/.exec(line)
+    if (!match) return true
+    if (!match[1].startsWith(`${name}-`)) return true
+    return match[1] === keep
+  })
+  if (dryRun) return
+  writeFileSync(indexPath, kept.join('\n'))
 }
 
 /** Add or refresh this version's row in the sync repo index, in place. */
@@ -267,6 +304,7 @@ async function main() {
   })
 
   copyPreview(dir)
+  pruneOlderVersions(`${name}-${version}`)
 
   const description = manifest.description ?? ''
   updateIndexRow({
