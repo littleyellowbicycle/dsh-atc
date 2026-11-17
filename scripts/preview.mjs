@@ -76,8 +76,8 @@ const item = (tool, title, workspace, status, minutesAgo, detail = '') => ({
  */
 const items = [
   item('opencode', '附件上传大文件时进度条卡在 99%', 'D:/work/file-service', 'needs-you', 14, 'todo 2/5'),
-  item('dsh', '把日志采集改成批量写入', 'D:/work/log-pipeline', 'running', 0),
-  item('dsh', '给网关加一层请求重试', 'D:/work/gateway', 'running', 3),
+  { ...item('dsh', '把日志采集改成批量写入', 'D:/work/log-pipeline', 'running', 0), doing: 'pwsh · 跑一次采集脚本的耗时对比' },
+  { ...item('dsh', '给网关加一层请求重试', 'D:/work/gateway', 'running', 3), doing: 'write · src/gateway/retry.ts' },
   item('workbuddy', '每日站会纪要整理 09:00', 'WorkBuddy/2026-11-13', 'failed', 96),
   item('minimax', '竞品定价页的排版对比', 'D:/work/pricing-review', 'done', 22),
   item('codex', '升级构建脚本到 Node 24', 'D:/work/build-kit', 'stopped', 41),
