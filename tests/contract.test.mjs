@@ -223,6 +223,46 @@ test('every state gets a mark of its own', async () => {
   }
 })
 
+test('rows that share a title get a short id, only within one day', async () => {
+  const { shortSessionId, markDuplicateTitles } = await import(
+    pathToFileURL(join(root, 'lib', 'rules.mjs')).href
+  )
+
+  const noon = new Date('2026-11-16T12:00:00').getTime()
+  const nextDay = noon + 86_400_000
+
+  // Two sessions, same prompt, same second — the case that prompted this.
+  const pair = [
+    { tool: 'dsh', title: '你是独立评分员', workspace: 'w', lastActivity: noon, sessionId: 'session-9015d1a7-7084-4213' },
+    { tool: 'dsh', title: '你是独立评分员', workspace: 'w', lastActivity: noon, sessionId: 'session-9adb5f20-3c1e-4c82' },
+  ]
+  assert.equal(markDuplicateTitles(pair), 2)
+  assert.equal(pair[0].disambiguator, '4213')
+  assert.equal(pair[1].disambiguator, '4c82')
+  assert.notEqual(pair[0].disambiguator, pair[1].disambiguator)
+
+  // Same title on different days: the date line already distinguishes them, so
+  // no id — otherwise every daily automation would collect one.
+  const daily = [
+    { tool: 'workbuddy', title: '每日自动签到', workspace: 'w', lastActivity: noon, key: 'a7fb367c-1111' },
+    { tool: 'workbuddy', title: '每日自动签到', workspace: 'w', lastActivity: nextDay, key: '4dc00b3f-2222' },
+  ]
+  assert.equal(markDuplicateTitles(daily), 0)
+  assert.equal(daily[0].disambiguator, undefined)
+
+  // A unique title stays clean.
+  const single = [{ tool: 'dsh', title: '只有一个', workspace: 'w', lastActivity: noon, sessionId: 'session-1' }]
+  assert.equal(markDuplicateTitles(single), 0)
+
+  // The suffix is the id's tail, not the file extension.
+  assert.equal(shortSessionId({ sessionId: 'session-c0520b56-1111-2222' }), '2222')
+  assert.equal(shortSessionId({ openId: 'ses_e1cd4e6c8ffe' }), '8ffe')
+  assert.equal(
+    shortSessionId({ key: 'C:/x/.gemini/tmp/p/chats/session-2026-05-09T03-24-97ab3090.json' }),
+    '3090',
+  )
+})
+
 test('the detail drawer pairs calls with results across frames', async () => {
   const { mkdtempSync, writeFileSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')

@@ -1085,7 +1085,14 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { className: 'fb-session-top' },
-          h('div', { className: 'fb-session-title' }, item.title),
+          h(
+            'div',
+            { className: 'fb-session-title' },
+            item.title,
+            item.disambiguator
+              ? h('span', { className: 'fb-session-id' }, '#', item.disambiguator)
+              : null,
+          ),
           h(
             'button',
             {
@@ -2260,6 +2267,7 @@ function EmptyState({ board }) {
 .fb-session-clickable:hover{border-color:#c3d0f6;box-shadow:0 4px 14px rgba(20,28,45,.07)}
 .fb-session-top{display:flex;align-items:flex-start;gap:10px}
 .fb-session-title{flex:1;min-width:0;font-size:12.5px;font-weight:600;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.fb-session-id{margin-left:6px;font-size:10.5px;color:var(--fb-text-4);font-variant-numeric:tabular-nums;font-weight:400}
 .fb-session-time{flex:none;font-size:11px;color:var(--fb-text-4);font-variant-numeric:tabular-nums;white-space:nowrap;padding-top:1px}
 .fb-session-date{font-size:10.5px;color:var(--fb-text-4);font-variant-numeric:tabular-nums;margin-top:-3px}
 .fb-session-tags{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
